@@ -11,6 +11,7 @@ const CONFIG = {
   // ╚══════════════════════════════════════╝
 
   MEMOS_URL: 'https://memos.ahxin.cn',         // Memos 实例地址（无末尾斜杠）
+  API_PREFIX: '/api/v1',                        // Memos API 路径前缀（通常就是 /api/v1）
   ADMIN_NAME: 'ahxin',                           // ★ Memos 用户名，API 身份标识
 
   USE_PROXY: true,                               // ★ true=走代理 | false=直连(CORS 需配置)
