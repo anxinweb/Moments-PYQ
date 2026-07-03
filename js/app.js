@@ -32,9 +32,10 @@
     lightboxTouchStartY: 0,
     lightboxSwipeHandled: false,
     loadedCount: 0,
-    publishToken: sessionStorage.getItem('moments-publish-token') || '',
-    publishAuthMode: sessionStorage.getItem('moments-publish-auth-mode') || 'proxy',
-    directApiMode: !!sessionStorage.getItem('moments-publish-token') && sessionStorage.getItem('moments-publish-auth-mode') === 'direct',
+    // 持久化登录：口令(proxy)永不过期，真实Token(direct)7天过期
+    publishToken: (() => { try { const d = JSON.parse(localStorage.getItem('moments-publish-token')); if (!d) return ''; const expired = d.m === 'direct' && Date.now() - d.t > 7*86400000; return expired ? '' : d.v; } catch {} return ''; })(),
+    publishAuthMode: (() => { try { const d = JSON.parse(localStorage.getItem('moments-publish-token')); if (!d) return 'proxy'; const expired = d.m === 'direct' && Date.now() - d.t > 7*86400000; return expired ? 'proxy' : d.m || 'proxy'; } catch {} return 'proxy'; })(),
+    directApiMode: (() => { try { const d = JSON.parse(localStorage.getItem('moments-publish-token')); if (!d) return false; const expired = d.m === 'direct' && Date.now() - d.t > 7*86400000; return expired ? false : d.m === 'direct'; } catch {} return false; })(),
     activeDate: '',
     editingMemoName: '',
     selectedPublishFiles: [],
@@ -235,7 +236,7 @@
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     };
-    const token = state.publishToken || sessionStorage.getItem('moments-publish-token') || '';
+    const token = state.publishToken || '';
     if (state.directApiMode && token) {
       headers['Authorization'] = `Bearer ${token}`;
     } else if (token) {
@@ -2309,6 +2310,7 @@
     state.publishToken = '';
     state.publishAuthMode = 'proxy';
     state.directApiMode = false;
+    localStorage.removeItem('moments-publish-token');
     sessionStorage.removeItem('moments-publish-token');
     sessionStorage.removeItem('moments-publish-auth-mode');
     updatePublishAuthUI();
@@ -2336,6 +2338,8 @@
       state.publishToken = token;
       state.publishAuthMode = mode;
       state.directApiMode = mode === 'direct';
+      // 持久化到 localStorage（7天过期），同时兼容旧版 sessionStorage
+      localStorage.setItem('moments-publish-token', JSON.stringify({ v: token, m: mode, t: Date.now() }));
       sessionStorage.setItem('moments-publish-token', token);
       sessionStorage.setItem('moments-publish-auth-mode', mode);
       dom.publishTokenInput.value = '';
