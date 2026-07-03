@@ -14,6 +14,19 @@
   <link rel="icon" type="image/x-icon" href="./assets/faviconpyq.ico">
   <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./assets/pwa-180.png">
   <link rel="manifest" href="./manifest.webmanifest">
+  <!-- 预连接到 Memos 实例，加速首次 API 与附件请求 -->
+  <link rel="preconnect" href="https://memos.ahxin.cn" crossorigin>
+  <link rel="dns-prefetch" href="https://memos.ahxin.cn">
+  <!-- SEO: Open Graph / Twitter Card -->
+  <meta property="og:title" content="Ah新的朋友圈">
+  <meta property="og:description" content="记录生活中的每一刻">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="./assets/pwa-512.png">
+  <meta property="og:locale" content="zh_CN">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Ah新的朋友圈">
+  <meta name="twitter:description" content="记录生活中的每一刻">
+  <meta name="twitter:image" content="./assets/pwa-512.png">
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css">
   <!-- Anti-FOUC: 在渲染前立即设置主题，避免闪烁 -->

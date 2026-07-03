@@ -1291,12 +1291,16 @@
 
       updatePaginationUI();
 
-      // 如果是从缓存恢复的，在后台静默刷新（不阻塞UI）
+      // 缓存已渲染，尽早后台刷新以拉取新内容
+      // 用 requestIdleCallback 避免与首屏渲染及 reactions/previews 请求竞争
       if (state.cacheRestored && !forceRefresh) {
         state.cacheRestored = false;
-        setTimeout(() => {
-          silentRefresh();
-        }, 3000);
+        const triggerRefresh = () => silentRefresh();
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(triggerRefresh, { timeout: 2000 });
+        } else {
+          setTimeout(triggerRefresh, 1000);
+        }
       }
     } catch (e) {
       console.error('Failed to load memos:', e);
@@ -2802,7 +2806,13 @@
     bindEvents();
     updatePublishAuthUI();
 
-    loadUserProfile().finally(() => loadInitial()).then(() => {
+    // 并行加载：用户画像与内容列表同时请求，避免串行等待，显著提升首屏速度
+    // - 有缓存时：两者各自从缓存立即恢复，首屏近乎瞬开
+    // - 无缓存时：两个网络请求并行，比串行快一倍
+    Promise.all([
+      loadUserProfile(),
+      loadInitial()
+    ]).then(() => {
       initInfiniteScroll();
       initRealTimeUpdates();
       scrollToHashMemo();
