@@ -29,6 +29,8 @@
   <meta name="twitter:image" content="./assets/pwa-512.png">
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css">
+  <!-- config.js 同步加载,确保 Anti-FOUC 能读到主题配置,避免主题闪烁 -->
+  <script src="config.js"></script>
   <!-- Anti-FOUC: 在渲染前立即设置主题，避免闪烁 -->
   <script>
   (function(){
@@ -349,8 +351,7 @@
     </svg>
   </button>
 
-  <!-- Scripts: defer 让浏览器尽早并行下载,不阻塞 HTML 解析 -->
-  <script src="config.js" defer></script>
+  <!-- Scripts: app.js defer 让浏览器尽早并行下载,不阻塞 HTML 解析 -->
   <script src="js/app.js" defer></script>
 </body>
 </html>

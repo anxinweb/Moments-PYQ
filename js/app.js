@@ -2861,6 +2861,11 @@
   // ==================== 初始化 ====================
 
   function init() {
+    // 刷新时不恢复滚动位置,避免 DOM 异步重建导致滚动到错误位置
+    // (loadInitial 清空 DOM 只重建第一页,浏览器恢复旧滚动位置会看到旧内容)
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
     applyConfigStyles();
     dom.siteName.textContent = CONFIG.SITE_NAME;
     dom.siteIcon.style.display = CONFIG.SHOW_SITE_LOGO === false ? 'none' : '';
