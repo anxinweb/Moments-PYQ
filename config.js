@@ -93,6 +93,7 @@ const CONFIG = {
   // ╚══════════════════════════════════════╝
 
   REACTION_EMOJIS: ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '💯'],
+  ENABLE_REACTIONS_FETCH: false,                  //   是否首屏拉取 reactions(20条×1请求,慢),false=点击时才拉取
   SEARCH_DEBOUNCE: 300,                          //   搜索防抖 ms
   ENABLE_STATS: true,                            //   是否启用统计面板
 

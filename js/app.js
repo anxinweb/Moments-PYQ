@@ -732,7 +732,10 @@
 
   async function fetchReactions(memoName) {
     try {
-      const data = await apiFetch(`/${memoName}/reactions`);
+      // memoName 形如 "memos/xxx",reactions 路径为 /memos/{name}/reactions
+      // 需先去掉前缀 "memos/",避免拼成 /memos/memos/xxx/reactions (404)
+      const id = memoName.startsWith('memos/') ? memoName.slice(6) : memoName;
+      const data = await apiFetch(`/memos/${id}/reactions`);
       state.allReactions[memoName] = data.reactions || [];
       return data.reactions || [];
     } catch { return []; }
@@ -744,7 +747,9 @@
       return;
     }
     try {
-      await apiFetch(`/${memoName}/reactions`, {
+      // 去掉 "memos/" 前缀,避免路径 /memos/memos/xxx/reactions (404)
+      const id = memoName.startsWith('memos/') ? memoName.slice(6) : memoName;
+      await apiFetch(`/memos/${id}/reactions`, {
         method: 'POST',
         body: JSON.stringify({
           reaction: {
@@ -1357,7 +1362,8 @@
         }
       };
       deferHeavyFetch(() => {
-        loadReactions(state.memos);
+        // reactions 默认不首屏拉取(20 条各发一个请求,拖慢首屏),改为点击时按需拉取
+        if (CONFIG.ENABLE_REACTIONS_FETCH) loadReactions(state.memos);
         loadLinkPreviews(state.memos);
       });
 
@@ -1439,7 +1445,7 @@
           state.memos = filtered.slice(0, CONFIG.PAGE_SIZE);
           state.loadedCount = state.memos.length;
           state.hasMore = filtered.length > state.loadedCount || !!state.nextPageToken;
-          loadReactions(visibleNew);
+          if (CONFIG.ENABLE_REACTIONS_FETCH) loadReactions(visibleNew);
           loadLinkPreviews(visibleNew);
         }
       }
@@ -1496,7 +1502,7 @@
 
       state.memos.push(...newMemos);
       renderCards(newMemos, true);
-      loadReactions(newMemos);
+      if (CONFIG.ENABLE_REACTIONS_FETCH) loadReactions(newMemos);
       loadLinkPreviews(newMemos);
       initLazyLoad();
 
@@ -1569,7 +1575,7 @@
       return;
     }
     renderCards(pageMemos);
-    loadReactions(pageMemos);
+    if (CONFIG.ENABLE_REACTIONS_FETCH) loadReactions(pageMemos);
     loadLinkPreviews(pageMemos);
     initLazyLoad();
     updatePaginationUI();
@@ -1690,7 +1696,7 @@
     state.loadedCount = state.memos.length;
     state.hasMore = filtered.length > state.loadedCount;
     renderCards(state.memos);
-    loadReactions(state.memos);
+    if (CONFIG.ENABLE_REACTIONS_FETCH) loadReactions(state.memos);
     loadLinkPreviews(state.memos);
     initLazyLoad();
     dom.loadMore.style.display = state.hasMore ? '' : 'none';
@@ -1720,7 +1726,7 @@
       state.loadedCount = 1;
       dom.memoList.innerHTML = '';
       renderCards(state.memos);
-      loadReactions(state.memos);
+      if (CONFIG.ENABLE_REACTIONS_FETCH) loadReactions(state.memos);
       loadLinkPreviews(state.memos);
       initLazyLoad();
       // 平滑滚动到卡片
@@ -1754,19 +1760,27 @@
       state.allReactions.restored = true;
     }
 
-    await Promise.all(memos.map(memo => {
-      // 已有缓存则直接更新 UI，跳过网络请求
+    // 分批并发拉取,避免一次性 20 个请求冲击 vercel serverless (并发限制/冷启动雪崩)
+    // 每批 5 个并发,批间微延迟
+    const CONCURRENCY = 5;
+    const needFetch = memos.filter(memo => {
       if (state.allReactions[memo.name]) {
         updateReactionsUI(memo.name, state.allReactions[memo.name]);
-        return Promise.resolve();
+        return false;
       }
-      return fetchReactions(memo.name).then(reactions => {
-        state.allReactions[memo.name] = reactions;
-        updateReactionsUI(memo.name, reactions);
-      });
-    }));
+      return true;
+    });
 
-    // 缓存反应数据
+    for (let i = 0; i < needFetch.length; i += CONCURRENCY) {
+      const batch = needFetch.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(memo =>
+        fetchReactions(memo.name).then(reactions => {
+          state.allReactions[memo.name] = reactions;
+          updateReactionsUI(memo.name, reactions);
+        })
+      ));
+    }
+
     cacheManager.reactions = state.allReactions;
   }
 
