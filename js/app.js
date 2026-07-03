@@ -23,6 +23,7 @@
     sseConnection: null,
     pollTimer: null,
     allReactions: {},
+    linkPreviewCache: {},
     isGuest: true,
     lastScrollY: 0,
     navScrolled: false,
@@ -50,6 +51,73 @@
     // 批量操作
     batchMode: false,
     selectedMemos: new Set(),
+    // 缓存状态
+    cacheRestored: false,
+  };
+
+  // ==================== 智能缓存管理器 ====================
+  const CACHE_KEY = 'moments-cache-v1';
+  const CACHE_TTL = 5 * 60 * 1000; // 5分钟
+  const CACHE_MAX_AGE = 30 * 60 * 1000; // 30分钟强制刷新
+
+  const cacheManager = {
+    get(key, maxAge = CACHE_TTL) {
+      try {
+        const raw = sessionStorage.getItem(`${CACHE_KEY}:${key}`);
+        if (!raw) return null;
+        const entry = JSON.parse(raw);
+        const age = Date.now() - entry.ts;
+        if (age > maxAge) {
+          sessionStorage.removeItem(`${CACHE_KEY}:${key}`);
+          return null;
+        }
+        return entry.data;
+      } catch { return null; }
+    },
+    set(key, data) {
+      try {
+        const entry = { ts: Date.now(), data };
+        sessionStorage.setItem(`${CACHE_KEY}:${key}`, JSON.stringify(entry));
+      } catch {
+        // 存储满时清理旧缓存
+        try {
+          const keys = Object.keys(sessionStorage).filter(k => k.startsWith(CACHE_KEY));
+          keys.sort((a, b) => {
+            const ea = JSON.parse(sessionStorage.getItem(a) || '{"ts":0}');
+            const eb = JSON.parse(sessionStorage.getItem(b) || '{"ts":0}');
+            return ea.ts - eb.ts;
+          });
+          // 删除最旧的50%
+          keys.slice(0, Math.ceil(keys.length / 2)).forEach(k => sessionStorage.removeItem(k));
+          // 重试
+          sessionStorage.setItem(`${CACHE_KEY}:${key}`, JSON.stringify({ ts: Date.now(), data }));
+        } catch { /* ignore */ }
+      }
+    },
+    clear() {
+      try {
+        Object.keys(sessionStorage).forEach(k => {
+          if (k.startsWith(CACHE_KEY)) sessionStorage.removeItem(k);
+        });
+      } catch { /* ignore */ }
+    },
+    get memos() { return this.get('memos', CACHE_MAX_AGE); },
+    set memos(data) { this.set('memos', data); },
+    get tags() { return this.get('tags', CACHE_MAX_AGE); },
+    set tags(data) { this.set('tags', data); },
+    get reactions() { return this.get('reactions', CACHE_MAX_AGE); },
+    set reactions(data) { this.set('reactions', data); },
+    get linkPreviews() { return this.get('linkPreviews', CACHE_MAX_AGE); },
+    set linkPreviews(data) { this.set('linkPreviews', data); },
+    get userProfile() { return this.get('userProfile', CACHE_MAX_AGE); },
+    set userProfile(data) { this.set('userProfile', data); },
+    invalidateAll() {
+      this.clear();
+      state.allReactions = {};
+      state.linkPreviewCache = {};
+      state.allPublicMemos = [];
+      state.allTags = [];
+    },
   };
 
   // ==================== DOM 引用 ====================
@@ -111,6 +179,8 @@
     publishFileList: $('#publishFileList'),
     publishCharCount: $('#publishCharCount'),
     publishSubmit: $('#publishSubmit'),
+    publishDraftHint: $('#publishDraftHint'),
+    publishDraftClear: $('#publishDraftClear'),
     paginationNav: $('#paginationNav'),
     pagPrev: $('#pagPrev'),
     pagNext: $('#pagNext'),
@@ -444,37 +514,43 @@
 
   // ==================== 导航栏滚动效果 ====================
 
+  // 滚动事件节流（16ms ≈ 60fps）
+  let scrollTicking = false;
   function handleScroll() {
-    const scrollY = window.scrollY;
-    const delta = scrollY - state.lastScrollY;
-    const navHeight = 60;
+    if (scrollTicking) return;
+    scrollTicking = true;
+    requestAnimationFrame(() => {
+      const scrollY = window.scrollY;
+      const delta = scrollY - state.lastScrollY;
 
-    // 磨砂玻璃
-    if (scrollY > 10 && !state.navScrolled) {
-      dom.navbar.classList.add('scrolled');
-      state.navScrolled = true;
-    } else if (scrollY <= 10 && state.navScrolled) {
-      dom.navbar.classList.remove('scrolled');
-      state.navScrolled = false;
-    }
+      // 磨砂玻璃
+      if (scrollY > 10 && !state.navScrolled) {
+        dom.navbar.classList.add('scrolled');
+        state.navScrolled = true;
+      } else if (scrollY <= 10 && state.navScrolled) {
+        dom.navbar.classList.remove('scrolled');
+        state.navScrolled = false;
+      }
 
-    // 收缩导航栏（快速下滑时）
-    if (scrollY > 150 && delta > 5 && !state.navCompact) {
-      dom.navbar.classList.add('compact');
-      state.navCompact = true;
-    } else if ((scrollY <= 150 || delta < -5) && state.navCompact) {
-      dom.navbar.classList.remove('compact');
-      state.navCompact = false;
-    }
+      // 收缩导航栏（快速下滑时）
+      if (scrollY > 150 && delta > 5 && !state.navCompact) {
+        dom.navbar.classList.add('compact');
+        state.navCompact = true;
+      } else if ((scrollY <= 150 || delta < -5) && state.navCompact) {
+        dom.navbar.classList.remove('compact');
+        state.navCompact = false;
+      }
 
-    // 回到顶部按钮（不显示进度环）
-    if (scrollY > 400) {
-      dom.backToTop.classList.add('visible');
-    } else {
-      dom.backToTop.classList.remove('visible');
-    }
+      // 回到顶部按钮
+      if (scrollY > 400) {
+        dom.backToTop.classList.add('visible');
+      } else {
+        dom.backToTop.classList.remove('visible');
+      }
 
-    state.lastScrollY = scrollY;
+      state.lastScrollY = scrollY;
+      scrollTicking = false;
+    });
   }
 
   // ==================== 主题管理 ====================
@@ -563,7 +639,25 @@
   }
 
   async function fetchAllPublicMemos(force = false) {
+    // 尝试从缓存恢复
+    if (!force && state.allPublicMemos.length === 0) {
+      const cached = cacheManager.memos;
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        state.allPublicMemos = cached;
+        // 同时恢复标签缓存
+        const cachedTags = cacheManager.tags;
+        if (cachedTags) {
+          state.allTags = cachedTags;
+          renderTagsNav();
+        } else {
+          collectTags();
+        }
+        state.cacheRestored = true;
+        return state.allPublicMemos;
+      }
+    }
     if (!force && state.allPublicMemos.length > 0) return state.allPublicMemos;
+
     const all = [];
     let pageToken = '';
     let maxPages = 10;
@@ -575,8 +669,10 @@
       pageToken = data.nextPageToken || data.next_page_token || '';
     } while (pageToken);
     state.allPublicMemos = all.filter(memo => state.isGuest ? isPublicMemo(memo) : true);
+    // 写入缓存
+    cacheManager.memos = state.allPublicMemos;
     collectTags();
-    return all;
+    return state.allPublicMemos;
   }
 
   function getFilteredMemos() {
@@ -817,12 +913,18 @@
 
   async function loadUserProfile() {
     if (!CONFIG.AUTO_FETCH_MEMOS_USER_PROFILE) return;
+    // 尝试从缓存恢复
+    const cached = cacheManager.userProfile;
+    if (cached) {
+      state.userProfile = cached;
+    }
     const user = await fetchUser();
     if (!user) return;
     state.userProfile = {
       displayName: getField(user, 'displayName', 'display_name') || user.username || CONFIG.ADMIN_NICKNAME || CONFIG.ADMIN_NAME,
       avatarUrl: normalizeMemosUrl(getField(user, 'avatarUrl', 'avatar_url') || ''),
     };
+    cacheManager.userProfile = state.userProfile;
   }
 
   // ==================== 渲染 ====================
@@ -1140,10 +1242,18 @@
     state.firstLoad = true;
     state.loadedCount = 0;
     state.paginationPage = 1;
-    // 骨架屏只首次显示
-    if (dom.memoList.children.length === 0) {
+
+    // 判断是否可以从缓存快速渲染
+    const canRestore = !forceRefresh && state.allPublicMemos.length === 0 && cacheManager.memos;
+    const isCacheValid = canRestore && cacheManager.memos.length > 0;
+
+    // 如果有缓存，先隐藏骨架屏，后续用缓存数据立即渲染
+    if (isCacheValid) {
+      dom.skeletonWrap.style.display = 'none';
+    } else if (dom.memoList.children.length === 0) {
       dom.skeletonWrap.style.display = '';
     }
+
     dom.memoList.innerHTML = '';
     dom.loadMore.style.display = 'none';
     dom.loadMoreClick.style.display = 'none';
@@ -1179,16 +1289,84 @@
       initLazyLoad();
 
       updatePaginationUI();
+
+      // 如果是从缓存恢复的，在后台静默刷新（不阻塞UI）
+      if (state.cacheRestored && !forceRefresh) {
+        state.cacheRestored = false;
+        setTimeout(() => {
+          silentRefresh();
+        }, 3000);
+      }
     } catch (e) {
       console.error('Failed to load memos:', e);
-      dom.skeletonWrap.style.display = 'none';
-      dom.emptyState.style.display = '';
-      showToast('加载失败，请检查配置', 'error');
+      // 如果缓存恢复失败且没有数据，才显示错误
+      if (state.allPublicMemos.length === 0) {
+        dom.skeletonWrap.style.display = 'none';
+        dom.emptyState.style.display = '';
+        showToast('加载失败，请检查配置', 'error');
+      }
     }
 
     state.loading = false;
     state.firstLoad = false;
     return state.memos;
+  }
+
+  // 后台静默刷新：精确检测真正的新 memo 并增量插入
+  async function silentRefresh() {
+    try {
+      const data = await fetchMemos('');
+      const freshMemos = data.memos || [];
+      if (freshMemos.length === 0 || state.allPublicMemos.length === 0) return;
+
+      // 用 name 集合精确判断：只有之前完全不存在的 memo 才算"新增"
+      const existingNames = new Set(state.allPublicMemos.map(m => m.name));
+      const trulyNew = freshMemos.filter(m => !existingNames.has(m.name));
+
+      if (trulyNew.length === 0) return; // 没有真正的新内容
+
+      // 按 API 返回顺序（即 pinned desc, create_time desc）prepend 新 memo
+      for (const m of trulyNew.reverse()) {
+        state.allPublicMemos.unshift(m);
+        existingNames.add(m.name);
+      }
+
+      // 重新过滤+分页
+      const filtered = getFilteredMemos();
+      state.paginationTotalPages = Math.ceil(filtered.length / CONFIG.PAGE_SIZE) || 1;
+
+      // 如果在第一页且无搜索/标签过滤，prepend 新卡片到 DOM 顶部
+      if (state.paginationPage === 1 && !state.searchQuery && state.activeTag === 'all' && !state.visibilityFilter) {
+        const visibleNew = trulyNew.filter(m => {
+          if (state.isGuest && !isPublicMemo(m)) return false;
+          return true;
+        });
+        if (visibleNew.length > 0) {
+          const frag = document.createDocumentFragment();
+          visibleNew.reverse().forEach(m => {
+            const card = renderMemoCard(m);
+            if (card) {
+              card.style.animation = 'none';
+              card.style.opacity = '1';
+              frag.prepend(card);
+            }
+          });
+          dom.memoList.prepend(frag);
+          state.memos = filtered.slice(0, CONFIG.PAGE_SIZE);
+          state.loadedCount = state.memos.length;
+          state.hasMore = filtered.length > state.loadedCount;
+          loadReactions(visibleNew);
+          loadLinkPreviews(visibleNew);
+        }
+      }
+
+      // 更新缓存
+      cacheManager.memos = state.allPublicMemos;
+
+      showToast(`${trulyNew.length} 条新内容`, 'info', 1500);
+    } catch (err) {
+      console.warn('Silent refresh failed:', err);
+    }
   }
 
   async function loadMore() {
@@ -1360,6 +1538,7 @@
     }
     showToast(`操作完成：${success} 成功${fail ? `，${fail} 失败` : ''}`, fail ? 'warning' : 'success');
     exitBatchMode();
+    cacheManager.invalidateAll();
     await loadInitial(true);
   }
 
@@ -1380,6 +1559,7 @@
     }
     showToast(`删除完成：${success} 成功${fail ? `，${fail} 失败` : ''}`, fail ? 'warning' : 'success');
     exitBatchMode();
+    cacheManager.invalidateAll();
     await loadInitial(true);
   }
 
@@ -1463,6 +1643,13 @@
   }
 
   async function loadReactions(memos) {
+    // 尝试从缓存恢复所有反应
+    const cachedReactions = cacheManager.reactions;
+    if (cachedReactions && !state.allReactions.restored) {
+      Object.assign(state.allReactions, cachedReactions);
+      state.allReactions.restored = true;
+    }
+
     await Promise.all(memos.map(memo => {
       // 已有缓存则直接更新 UI，跳过网络请求
       if (state.allReactions[memo.name]) {
@@ -1474,9 +1661,18 @@
         updateReactionsUI(memo.name, reactions);
       });
     }));
+
+    // 缓存反应数据
+    cacheManager.reactions = state.allReactions;
   }
 
   async function loadLinkPreviews(memos) {
+    // 从缓存恢复链接预览数据
+    const cachedPreviews = cacheManager.linkPreviews;
+    if (cachedPreviews) {
+      Object.assign(state.linkPreviewCache, cachedPreviews);
+    }
+
     for (const memo of memos) {
       const urls = extractPreviewUrls(memo.content || '');
       if (urls.length === 0) continue;
@@ -1484,14 +1680,20 @@
       if (!container) continue;
 
       const results = await Promise.allSettled(
-        urls.filter(canPreviewUrl).map(url =>
-          fetchLinkMetadata(url).then(meta => ({ url, meta }))
-        )
+        urls.filter(canPreviewUrl).map(url => {
+          // 检查缓存
+          if (state.linkPreviewCache[url]) {
+            return Promise.resolve({ url, meta: state.linkPreviewCache[url] });
+          }
+          return fetchLinkMetadata(url).then(meta => ({ url, meta }));
+        })
       );
       for (const result of results) {
         if (result.status !== 'fulfilled' || !result.value) continue;
         const { url, meta } = result.value;
         if (!meta || !(meta.title || meta.description || meta.image)) continue;
+        // 缓存结果
+        state.linkPreviewCache[url] = meta;
         const linkEl = container.querySelector(`a[href="${url}"]`);
         if (linkEl) {
           let imgUrl = '';
@@ -1508,6 +1710,9 @@
         }
       }
     }
+
+    // 缓存链接预览数据
+    cacheManager.linkPreviews = state.linkPreviewCache;
   }
 
   // ==================== 标签管理 ====================
@@ -1516,6 +1721,7 @@
     const tagSet = new Set();
     state.allPublicMemos.forEach(m => getMemoTags(m).forEach(t => tagSet.add(t)));
     state.allTags = [...tagSet].sort();
+    cacheManager.tags = state.allTags;
     renderTagsNav();
   }
 
@@ -1975,12 +2181,14 @@
     try {
       const data = await fetchMemos('');
       const latestMemos = data.memos || [];
-      if (latestMemos.length > 0 && state.memos.length > 0) {
-        if (latestMemos[0].name !== state.memos[0].name) {
-          // 有新内容
-          loadInitial(true);
-          showToast('有新内容更新', 'success', 2000);
-        }
+      if (latestMemos.length === 0 || state.allPublicMemos.length === 0) return;
+
+      // 用 name 集合精确判断是否有全新 memo
+      const knownNames = new Set(state.allPublicMemos.map(m => m.name));
+      const newMemos = latestMemos.filter(m => !knownNames.has(m.name));
+      if (newMemos.length > 0) {
+        // 用 silentRefresh 智能增量插入，而非粗暴 reload
+        await silentRefresh();
       }
     } catch { /* silent */ }
   }
@@ -2018,12 +2226,73 @@
     }, 50);
   }
 
+  function savePublishDraft() {
+    // 保存发布草稿到 sessionStorage，防止意外关闭丢失
+    try {
+      const draft = {
+        content: dom.publishContent.value,
+        location: dom.publishLocation.value,
+        visibility: dom.publishVisibility.value,
+        pinned: dom.publishPinned.checked,
+        createTime: dom.publishCreateTime.value,
+        charCount: dom.publishContent.value.length,
+        fileNames: state.selectedPublishFiles.map(f => f.name || f.fileName || 'file'),
+        hasFiles: state.selectedPublishFiles.length > 0,
+      };
+      sessionStorage.setItem('moments-publish-draft', JSON.stringify(draft));
+    } catch { /* silent */ }
+  }
+
+  function hasPublishDraft() {
+    try {
+      const raw = sessionStorage.getItem('moments-publish-draft');
+      if (!raw) return false;
+      const draft = JSON.parse(raw);
+      return !!draft.content || !!draft.location || draft.hasFiles;
+    } catch { return false; }
+  }
+
+  function clearPublishDraft() {
+    sessionStorage.removeItem('moments-publish-draft');
+  }
+
   function openCreatePublishModal() {
-    resetPublishForm();
+    // 仅在编辑模式下重置；创建模式下如果已有草稿则恢复
+    const hasDraft = hasPublishDraft();
+    if (!state.editingMemoName && !hasDraft) {
+      resetPublishForm();
+    }
     openPublishModal();
+    // 恢复草稿
+    if (!state.editingMemoName && hasDraft) {
+      restorePublishDraft();
+    }
+    // 显示/隐藏草稿提示
+    if (dom.publishDraftHint) {
+      dom.publishDraftHint.classList.toggle('visible', hasPublishDraft());
+    }
+  }
+
+  function restorePublishDraft() {
+    try {
+      const raw = sessionStorage.getItem('moments-publish-draft');
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft.content) {
+        dom.publishContent.value = draft.content;
+        dom.publishCharCount.textContent = String(draft.charCount || draft.content.length);
+      }
+      if (draft.location) dom.publishLocation.value = draft.location;
+      if (draft.visibility) dom.publishVisibility.value = draft.visibility;
+      if (draft.pinned) dom.publishPinned.checked = true;
+      if (draft.createTime) dom.publishCreateTime.value = draft.createTime;
+      // 文件无法完全恢复（File 对象不可序列化），但保留提示
+    } catch { /* silent */ }
   }
 
   function closePublishModal() {
+    // 关闭前自动保存草稿
+    savePublishDraft();
     dom.publishModal.classList.remove('open');
     dom.btnAdmin.classList.remove('active');
   }
@@ -2116,6 +2385,7 @@
     state.selectedPublishFiles = [];
     dom.publishFileList.innerHTML = '';
     dom.publishCharCount.textContent = '0';
+    clearPublishDraft();
   }
 
   async function handlePublishSubmit() {
@@ -2149,6 +2419,7 @@
       }
       resetPublishForm();
       closePublishModal();
+      cacheManager.invalidateAll();
       await loadInitial(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       showToast(wasEditing ? '修改成功' : '发布成功', 'success');
@@ -2189,6 +2460,7 @@
     try {
       await deleteMemo(memoName);
       showToast('已删除', 'success');
+      cacheManager.invalidateAll();
       await loadInitial(true);
     } catch (err) {
       showToast(err.message || '删除失败', 'error', 4000);
@@ -2288,6 +2560,9 @@
     });
     dom.publishContent.addEventListener('input', () => {
       dom.publishCharCount.textContent = String(dom.publishContent.value.length);
+      // 防抖自动保存草稿
+      clearTimeout(dom.publishContent._draftTimer);
+      dom.publishContent._draftTimer = setTimeout(savePublishDraft, 500);
     });
     dom.publishFiles.addEventListener('change', () => addPublishFiles(dom.publishFiles.files));
     dom.publishFileList.addEventListener('click', (e) => {
@@ -2297,6 +2572,12 @@
       renderPublishFileList();
     });
     dom.publishSubmit.addEventListener('click', handlePublishSubmit);
+    dom.publishDraftClear?.addEventListener('click', () => {
+      clearPublishDraft();
+      resetPublishForm();
+      if (dom.publishDraftHint) dom.publishDraftHint.classList.remove('visible');
+      dom.publishContent?.focus();
+    });
     dom.memoList.addEventListener('click', (e) => {
       const editBtn = e.target.closest('.memo-edit');
       if (editBtn) startEditMemo(editBtn.dataset.memoName);

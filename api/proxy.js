@@ -59,9 +59,13 @@ module.exports = async (req, res) => {
     return;
   }
 
-  if (!['GET', 'HEAD'].includes(req.method) && !isPublishTokenValid(req)) {
-    res.status(401).json({ error: 'Invalid or missing publish token' });
-    return;
+  if (!['GET', 'HEAD'].includes(req.method)) {
+    // 仅当配置了 FRONTEND_PUBLISH_TOKEN 时才验证前端口令
+    // 未配置时放行，由 Memos 后端自行验证 token
+    if (FRONTEND_PUBLISH_TOKEN && !isPublishTokenValid(req)) {
+      res.status(401).json({ error: 'Invalid or missing publish token' });
+      return;
+    }
   }
 
   const prefix = decodedPath.startsWith('/file/') ? '' : API_PREFIX;

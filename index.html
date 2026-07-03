@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Moments</title>
   <meta name="description" content="记录生活中的每一刻">
-  <meta name="theme-color" content="#1e2638" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f0fdf4" media="(prefers-color-scheme: light)">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default-translucent">
   <meta name="apple-mobile-web-app-title" content="Ah新的朋友圈">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
-  <link rel="apple-touch-icon" href="./assets/pwa-192.png">
+  <link rel="icon" type="image/x-icon" href="./assets/faviconpyq.ico">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./assets/pwa-180.png">
   <link rel="manifest" href="./manifest.webmanifest">
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css">
@@ -49,11 +50,8 @@
     <!-- 搜索框 -->
     <div class="search-bar" id="searchBar">
       <div class="search-input-wrap">
-        <form autocomplete="off" style="display:contents" onsubmit="return false">
-          <input type="text" class="search-input-dummy" style="display:none" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="searchInput" placeholder="搜索内容..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search">
-        </form>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" id="searchInput" placeholder="搜索内容..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" name="moments-search" enterkeyhint="search">
         <button class="search-clear" id="searchClear" aria-label="清除搜索">&times;</button>
       </div>
     </div>
@@ -241,10 +239,17 @@
       <div class="modal-body">
         <div class="publish-login" id="loginPanel">
           <p class="publish-help">可输入前端发布口令走代理发布，也可输入真实 Memos Token 进入直连模式。</p>
-          <input class="publish-input" type="password" id="publishTokenInput" placeholder="前端发布口令 / Memos Token" autocomplete="current-password">
+          <form id="publishLoginForm" onsubmit="return false;">
+            <input class="publish-input" type="password" id="publishTokenInput" placeholder="前端发布口令 / Memos Token" autocomplete="off">
+          </form>
           <button class="publish-primary-btn" id="publishLoginBtn">登录</button>
         </div>
         <div class="publish-panel" id="publishPanel" style="display:none;">
+          <div class="publish-draft-hint" id="publishDraftHint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+            已恢复上次未发布的内容
+            <button id="publishDraftClear">清除</button>
+          </div>
           <textarea class="publish-textarea" id="publishContent" rows="7" placeholder="写点什么，支持 Markdown 和 #标签"></textarea>
           <div class="publish-meta-row">
             <select class="publish-select" id="publishVisibility" aria-label="可见性">
@@ -257,10 +262,12 @@
           </div>
           <input class="publish-input" type="datetime-local" id="publishCreateTime" aria-label="发布时间">
           <input class="publish-input" type="text" id="publishLocation" placeholder="位置（可选）">
-          <label class="publish-file-picker">
-            <input type="file" id="publishFiles" multiple accept="image/*,video/*,audio/*,.pdf,.txt,.md,.zip">
-            <span>选择附件</span>
-          </label>
+          <div class="publish-upload-area">
+            <label class="publish-file-picker">
+              <input type="file" id="publishFiles" multiple accept="image/*,video/*,audio/*,.pdf,.txt,.md,.zip">
+              <span>选择附件</span>
+            </label>
+          </div>
           <div class="publish-file-list" id="publishFileList"></div>
           <div class="publish-actions">
             <button class="publish-secondary-btn" id="publishLogoutBtn">退出登录</button>
