@@ -16,6 +16,33 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <!-- Styles -->
   <link rel="stylesheet" href="css/style.css">
+  <!-- Anti-FOUC: 在渲染前立即设置主题，避免闪烁 -->
+  <script>
+  (function(){
+    try {
+      var p = 'luxury', s = 'system';
+      // 尝试从 config.js 获取（如果已加载）
+      if (typeof CONFIG !== 'undefined') { p = CONFIG.THEME_PRESET || p; s = CONFIG.DARK_MODE_STRATEGY || CONFIG.DEFAULT_THEME || s; }
+      // 优先用用户手动选择的主题
+      var saved = localStorage.getItem('moments-theme');
+      var theme = saved || s;
+      if (theme === 'auto') theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      else if (theme === 'schedule') {
+        var now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+        theme = (m >= 1140 || m < 420) ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.setAttribute('data-palette', p);
+      // 设置 theme-color 匹配当前主题
+      var tc = document.querySelector('meta[name="theme-color"][content]');
+      if (tc) tc.content = theme === 'dark' ? '#0f172a' : '#f0fdf4';
+    } catch(e) {}
+  })();
+  </script>
+  <style>
+    /* Anti-FOUC: JS 加载前隐藏默认 M 字母图标和站点名 */
+    #siteIcon.placeholder { background: transparent !important; color: transparent !important; font-size: 0 !important; }
+  </style>
 </head>
 <body>
   <!-- 阅读进度条 -->
@@ -25,7 +52,7 @@
   <header class="navbar" id="navbar">
     <div class="navbar-inner">
       <div class="navbar-brand">
-        <span class="site-icon" id="siteIcon">M</span>
+        <span class="site-icon placeholder" id="siteIcon"></span>
         <h1 class="site-name" id="siteName"></h1>
       </div>
       <div class="navbar-actions">

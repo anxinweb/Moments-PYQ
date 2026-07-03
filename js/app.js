@@ -2780,6 +2780,7 @@
     applyConfigStyles();
     dom.siteName.textContent = CONFIG.SITE_NAME;
     dom.siteIcon.style.display = CONFIG.SHOW_SITE_LOGO === false ? 'none' : '';
+    dom.siteIcon.classList.remove('placeholder');
     dom.siteIcon.innerHTML = CONFIG.SHOW_SITE_LOGO !== false && CONFIG.SITE_LOGO_URL
       ? `<img src="${escapeHtml(CONFIG.SITE_LOGO_URL)}" alt="${escapeHtml(CONFIG.SITE_NAME)}">`
       : escapeHtml(CONFIG.SITE_ICON_TEXT || CONFIG.SITE_NAME.charAt(0).toUpperCase());
