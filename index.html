@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="auto">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moments</title>
+  <meta name="description" content="记录生活中的每一刻">
+  <meta name="theme-color" content="#1e2638" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ah新的朋友圈">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+  <link rel="apple-touch-icon" href="./assets/pwa-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- 阅读进度条 -->
+  <div class="reading-progress" id="readingProgress"></div>
+
+  <!-- 导航栏 -->
+  <header class="navbar" id="navbar">
+    <div class="navbar-inner">
+      <div class="navbar-brand">
+        <span class="site-icon" id="siteIcon">M</span>
+        <h1 class="site-name" id="siteName"></h1>
+      </div>
+      <div class="navbar-actions">
+        <button class="nav-btn" id="btnSearch" title="搜索" aria-label="搜索">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="nav-btn" id="btnStats" title="统计" aria-label="统计">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+        </button>
+        <button class="nav-btn" id="btnAdmin" title="发布内容" aria-label="发布内容">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
+        <button class="nav-btn nav-btn-batch hidden" id="btnBatch" title="批量操作" aria-label="批量操作">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </button>
+        <button class="nav-btn" id="btnTheme" title="切换主题" aria-label="切换主题">
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </div>
+    <!-- 搜索框 -->
+    <div class="search-bar" id="searchBar">
+      <div class="search-input-wrap">
+        <form autocomplete="off" style="display:contents" onsubmit="return false">
+          <input type="text" class="search-input-dummy" style="display:none" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="searchInput" placeholder="搜索内容..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search">
+        </form>
+        <button class="search-clear" id="searchClear" aria-label="清除搜索">&times;</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 标签导航栏 -->
+  <nav class="tags-nav" id="tagsNav">
+    <div class="tags-nav-inner">
+      <button class="tag-chip active" data-tag="all">全部</button>
+      <!-- 动态填充标签 -->
+    </div>
+  </nav>
+
+  <!-- 可见性筛选栏（登录后显示） -->
+  <nav class="vis-filter-bar" id="visFilterBar" style="display:none;">
+    <div class="vis-filter-inner">
+      <button class="vis-filter-chip active" data-vis="all">全部</button>
+      <button class="vis-filter-chip" data-vis="PUBLIC">公开</button>
+      <button class="vis-filter-chip" data-vis="PROTECTED">登录可见</button>
+      <button class="vis-filter-chip" data-vis="PRIVATE">私密</button>
+    </div>
+  </nav>
+
+  <!-- 链接视图返回按钮 -->
+  <div class="hash-back-bar" id="hashBackBtn" style="display:none;">
+    <div class="hash-back-inner">
+      <button class="hash-back-btn">← 返回全部</button>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <main class="main-content" id="mainContent">
+    <!-- 加载骨架屏 -->
+    <div class="skeleton-wrap" id="skeletonWrap">
+      <div class="skeleton-card">
+        <div class="skeleton-header">
+          <div class="skeleton-avatar"></div>
+          <div class="skeleton-meta">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line shorter"></div>
+          </div>
+        </div>
+        <div class="skeleton-body">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line long"></div>
+        </div>
+      </div>
+      <div class="skeleton-card">
+        <div class="skeleton-header">
+          <div class="skeleton-avatar"></div>
+          <div class="skeleton-meta">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line shorter"></div>
+          </div>
+        </div>
+        <div class="skeleton-body">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line long"></div>
+        </div>
+      </div>
+      <div class="skeleton-card">
+        <div class="skeleton-header">
+          <div class="skeleton-avatar"></div>
+          <div class="skeleton-meta">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line shorter"></div>
+          </div>
+        </div>
+        <div class="skeleton-body">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line shorter"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Memo 卡片列表 -->
+    <div class="memo-list" id="memoList"></div>
+
+    <!-- 加载更多 -->
+    <div class="load-more" id="loadMore">
+      <div class="loader" id="loader">
+        <div class="loader-dot"></div>
+        <div class="loader-dot"></div>
+        <div class="loader-dot"></div>
+      </div>
+      <span class="load-more-text">加载更多...</span>
+    </div>
+
+    <!-- 无结果 -->
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <div class="empty-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+      </div>
+      <p class="empty-text">暂无内容</p>
+      <p class="empty-sub">这里还没有发布任何内容</p>
+    </div>
+
+    <!-- 搜索无结果 -->
+    <div class="empty-state" id="searchEmpty" style="display:none;">
+      <div class="empty-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      </div>
+      <p class="empty-text">未找到相关内容</p>
+      <p class="empty-sub">试试其他关键词</p>
+    </div>
+
+    <!-- 已加载全部 -->
+    <div class="end-state" id="endState" style="display:none;">
+      <span>已经到底啦</span>
+    </div>
+
+    <!-- 分页导航 -->
+    <div class="pagination-nav" id="paginationNav" style="display:none;">
+      <button class="pagination-btn" id="pagPrev" aria-label="上一页">‹ 上一页</button>
+      <div class="pagination-info">
+        <span id="pagCurrent">1</span> / <span id="pagTotal">1</span>
+      </div>
+      <div class="pagination-jump">
+        <button class="pagination-jump-toggle" id="pagJumpToggle" aria-label="跳转到指定页">跳转</button>
+        <div class="pagination-jump-input-wrap" id="pagJumpWrap" style="display:none;">
+          <input type="number" id="pagJumpInput" min="1" autocomplete="off" aria-label="跳转到第几页">
+          <button class="pagination-jump-go" id="pagJumpGo">确定</button>
+        </div>
+      </div>
+      <button class="pagination-btn" id="pagNext" aria-label="下一页">下一页 ›</button>
+    </div>
+
+    <!-- 加载更多（点击模式） -->
+    <div class="load-more load-more-click" id="loadMoreClick" style="display:none;">
+      <button class="load-more-btn" id="loadMoreClickBtn">加载更多</button>
+    </div>
+
+    <!-- 下载刷新指示器 -->
+    <div class="pull-indicator" id="pullIndicator">
+      <div class="pull-spinner"></div>
+      <span>刷新中...</span>
+    </div>
+  </main>
+
+  <!-- 批量操作工具栏 -->
+  <div class="batch-toolbar" id="batchToolbar">
+    <div class="batch-toolbar-inner">
+      <span class="batch-count" id="batchCount"></span>
+      <div class="batch-actions">
+        <button class="batch-btn" id="batchPublic" title="设为公开">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </button>
+        <button class="batch-btn" id="batchProtected" title="设为登录可见">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </button>
+        <button class="batch-btn" id="batchPrivate" title="设为私密">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+        <button class="batch-btn batch-btn-danger" id="batchDelete" title="批量删除">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        </button>
+        <button class="batch-btn batch-btn-cancel" id="batchCancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 统计面板 Modal -->
+  <div class="modal-overlay" id="statsModal">
+    <div class="modal-content stats-modal-content">
+      <div class="modal-header">
+        <h2>统计</h2>
+        <button class="modal-close" id="statsClose" aria-label="关闭">&times;</button>
+      </div>
+      <div class="modal-body" id="statsBody">
+        <!-- 动态填充 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 前端发布 Modal -->
+  <div class="modal-overlay" id="publishModal">
+    <div class="modal-content publish-modal-content">
+      <div class="modal-header">
+        <h2>发布内容</h2>
+        <button class="modal-close" id="publishClose" aria-label="关闭">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="publish-login" id="loginPanel">
+          <p class="publish-help">可输入前端发布口令走代理发布，也可输入真实 Memos Token 进入直连模式。</p>
+          <input class="publish-input" type="password" id="publishTokenInput" placeholder="前端发布口令 / Memos Token" autocomplete="current-password">
+          <button class="publish-primary-btn" id="publishLoginBtn">登录</button>
+        </div>
+        <div class="publish-panel" id="publishPanel" style="display:none;">
+          <textarea class="publish-textarea" id="publishContent" rows="7" placeholder="写点什么，支持 Markdown 和 #标签"></textarea>
+          <div class="publish-meta-row">
+            <select class="publish-select" id="publishVisibility" aria-label="可见性">
+              <option value="PUBLIC">公开</option>
+              <option value="PROTECTED">登录可见</option>
+              <option value="PRIVATE">私密</option>
+            </select>
+            <label class="publish-check"><input type="checkbox" id="publishPinned"> 置顶</label>
+            <span class="publish-count"><span id="publishCharCount">0</span> 字</span>
+          </div>
+          <input class="publish-input" type="datetime-local" id="publishCreateTime" aria-label="发布时间">
+          <input class="publish-input" type="text" id="publishLocation" placeholder="位置（可选）">
+          <label class="publish-file-picker">
+            <input type="file" id="publishFiles" multiple accept="image/*,video/*,audio/*,.pdf,.txt,.md,.zip">
+            <span>选择附件</span>
+          </label>
+          <div class="publish-file-list" id="publishFileList"></div>
+          <div class="publish-actions">
+            <button class="publish-secondary-btn" id="publishLogoutBtn">退出登录</button>
+            <button class="publish-primary-btn" id="publishSubmit">发布</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图片灯箱 -->
+  <div class="lightbox" id="lightbox" style="display:none;">
+    <button class="lightbox-close" id="lightboxClose" aria-label="关闭">&times;</button>
+    <button class="lightbox-prev" id="lightboxPrev" aria-label="上一张">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="lightbox-img-wrap" id="lightboxImgWrap">
+      <img id="lightboxImg" src="" alt="">
+    </div>
+    <button class="lightbox-next" id="lightboxNext" aria-label="下一张">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+    <div class="lightbox-counter" id="lightboxCounter"></div>
+  </div>
+
+  <!-- Reactions 选择器 -->
+  <div class="reaction-picker" id="reactionPicker" style="display:none;">
+    <div class="reaction-picker-inner" id="reactionPickerInner"></div>
+  </div>
+
+  <!-- Toast 容器 -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- 回到顶部 -->
+  <button class="back-to-top" id="backToTop" aria-label="回到顶部">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle class="progress-ring" cx="12" cy="12" r="10" fill="none" stroke-width="2" stroke="var(--border-color)" opacity="0.3"/>
+      <polyline points="18 15 12 9 6 15"/>
+    </svg>
+  </button>
+
+  <!-- Scripts -->
+  <script src="config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
