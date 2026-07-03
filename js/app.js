@@ -48,6 +48,8 @@
     hashViewMemo: null,        // 单条视图的 memo 数据
     // 后台分页补全:首屏只拉第一页立即渲染,剩余在后台异步拉取
     backgroundFetchPromise: null,
+    // 下一页 token:loadMore 直接用此 token 调 API 拉下一页,不等后台补全
+    nextPageToken: '',
     // 分页
     paginationPage: 1,
     paginationTotalPages: 1,
@@ -699,13 +701,14 @@
     const firstData = await apiFetch('/memos', {}, firstParams.toString());
     const firstMemos = (firstData.memos || []).filter(memo => state.isGuest ? isPublicMemo(memo) : true);
     state.allPublicMemos = firstMemos;
+    // 保存下一页 token,loadMore 直接用它调 API,不等后台补全
+    state.nextPageToken = firstData.nextPageToken || firstData.next_page_token || '';
     collectTags();
     cacheManager.memos = state.allPublicMemos;
 
-    // 后台补全剩余(用于搜索/统计/翻页),不阻塞首屏
-    const nextToken = firstData.nextPageToken || firstData.next_page_token || '';
-    if (nextToken) {
-      startBackgroundFetch(nextToken);
+    // 后台补全剩余(用于搜索/统计/翻页),不阻塞首屏,也不阻塞 loadMore
+    if (state.nextPageToken) {
+      startBackgroundFetch(state.nextPageToken);
     }
     return state.allPublicMemos;
   }
@@ -1326,8 +1329,8 @@
       state.paginationTotalPages = totalPages;
       state.memos = filtered.slice(0, CONFIG.PAGE_SIZE);
       state.loadedCount = state.memos.length;
-      // hasMore:本地数据未显示完,或后台仍在补全(补全后可能还有更多页)
-      state.hasMore = filtered.length > state.loadedCount || !!state.backgroundFetchPromise;
+      // hasMore:本地数据未显示完,或后端还有下一页(nextPageToken)
+      state.hasMore = filtered.length > state.loadedCount || !!state.nextPageToken;
 
       dom.skeletonWrap.style.display = 'none';
 
@@ -1435,7 +1438,7 @@
           dom.memoList.prepend(frag);
           state.memos = filtered.slice(0, CONFIG.PAGE_SIZE);
           state.loadedCount = state.memos.length;
-          state.hasMore = filtered.length > state.loadedCount || !!state.backgroundFetchPromise;
+          state.hasMore = filtered.length > state.loadedCount || !!state.nextPageToken;
           loadReactions(visibleNew);
           loadLinkPreviews(visibleNew);
         }
@@ -1457,14 +1460,30 @@
     dom.loadMoreClickBtn.disabled = true;
 
     try {
-      // 后台仍在补全历史分页时,先等它完成,避免取到空切片
-      if (state.backgroundFetchPromise) {
-        await state.backgroundFetchPromise;
-      }
+      let newMemos = [];
       const filtered = getFilteredMemos();
-      const newMemos = filtered.slice(state.loadedCount, state.loadedCount + CONFIG.PAGE_SIZE);
+
+      // 1) 优先用本地已有数据(缓存恢复或后台补全已完成的场景)
+      if (filtered.length > state.loadedCount) {
+        newMemos = filtered.slice(state.loadedCount, state.loadedCount + CONFIG.PAGE_SIZE);
+      }
+      // 2) 本地数据不够,且有 nextPageToken:直接调 API 拉下一页(不等后台补全)
+      else if (state.nextPageToken) {
+        const data = await fetchMemos(state.nextPageToken);
+        const fetched = (data.memos || []).filter(m => state.isGuest ? isPublicMemo(m) : true);
+        state.nextPageToken = data.nextPageToken || data.next_page_token || '';
+        // 去重后追加到 allPublicMemos
+        const existing = new Set(state.allPublicMemos.map(m => m.name));
+        const fresh = fetched.filter(m => !existing.has(m.name));
+        state.allPublicMemos.push(...fresh);
+        // 重新过滤并切片(可能有 searchQuery/activeTag 过滤)
+        const newFiltered = getFilteredMemos();
+        newMemos = newFiltered.slice(state.loadedCount, state.loadedCount + CONFIG.PAGE_SIZE);
+      }
+
       state.loadedCount += newMemos.length;
-      state.hasMore = filtered.length > state.loadedCount || !!state.backgroundFetchPromise;
+      // hasMore:后端还有下一页,或本地数据未显示完
+      state.hasMore = !!state.nextPageToken || getFilteredMemos().length > state.loadedCount;
 
       if (newMemos.length === 0) {
         state.hasMore = false;
