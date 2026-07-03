@@ -1,21 +1,13 @@
-const CACHE_NAME = 'ahxin-moments-v8';
+const CACHE_NAME = 'ahxin-moments-v9';
+// 首次访问只预缓存最核心的 HTML,其余资源靠运行时缓存自动积累
+// 避免 install 阶段并发 fetch 9 个文件,与首屏资源竞争带宽
 const APP_SHELL = [
   './',
-  './index.html',
-  './css/style.css',
-  './config.js',
-  './js/app.js',
-  './manifest.webmanifest',
-  './assets/faviconpyq.ico',
-  './assets/pwa-180.png',
-  './assets/pwa-192.png',
-  './assets/pwa-512.png',
-  './assets/pwa-192-maskable.png',
-  './assets/pwa-512-maskable.png'
+  './index.html'
 ];
 
 self.addEventListener('install', event => {
-  // 逐个缓存，失败的跳过（不因单个资源 404 导致整个 SW 安装失败）
+  // 只缓存 HTML 外壳,其余资源(JS/CSS/图标)由 fetch 事件运行时缓存
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => Promise.allSettled(
@@ -27,7 +19,7 @@ self.addEventListener('install', event => {
             .catch(() => { /* 忽略单个资源失败 */ })
         )
       ))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting()),
   );
 });
 

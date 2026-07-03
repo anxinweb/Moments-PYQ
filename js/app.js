@@ -960,6 +960,28 @@
       avatarUrl: normalizeMemosUrl(getField(user, 'avatarUrl', 'avatar_url') || ''),
     };
     cacheManager.userProfile = state.userProfile;
+    // 后台加载完成:批量更新已渲染卡片的头像和昵称
+    updateProfileInDOM();
+  }
+
+  // 用户画像后台加载完成后,批量更新 DOM 中已渲染卡片的头像/昵称
+  // 避免首屏等待 fetchUser 网络请求,先用 fallback 渲染,加载完再补全
+  function updateProfileInDOM() {
+    if (!state.userProfile) return;
+    const { displayName, avatarUrl } = state.userProfile;
+    const avatarLetter = avatarUrl ? '' : (displayName || '').charAt(0).toUpperCase();
+    const avatarHtml = avatarUrl
+      ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(displayName)}" loading="lazy">`
+      : avatarLetter;
+    dom.memoList.querySelectorAll('[data-profile="avatar"]').forEach(el => {
+      el.innerHTML = avatarHtml;
+    });
+    dom.memoList.querySelectorAll('[data-profile="author"]').forEach(el => {
+      // 保留 pinned badge 和 visibility badge,只替换文本节点
+      const badges = el.querySelectorAll('.pinned-badge, .memo-visibility-badge');
+      el.textContent = displayName;
+      badges.forEach(b => el.appendChild(b));
+    });
   }
 
   // ==================== 渲染 ====================
@@ -1064,11 +1086,11 @@
     card.innerHTML = `
       <span class="memo-checkbox" data-memo-name="${memo.name}" role="checkbox" aria-checked="false" tabindex="0"></span>
       <div class="memo-layout">
-        <div class="memo-avatar">${avatarHtml}</div>
+        <div class="memo-avatar" data-profile="avatar">${avatarHtml}</div>
         <div class="memo-main">
           <div class="memo-header">
             <div class="memo-meta">
-              <div class="memo-author">${escapeHtml(displayName)}${pinnedHtml}${visibilityBadge}</div>
+              <div class="memo-author" data-profile="author">${escapeHtml(displayName)}${pinnedHtml}${visibilityBadge}</div>
             </div>
           </div>
           <div class="memo-content ${contentNeedsExpand ? 'collapsed' : ''}" data-memo-id="${id}">${renderMarkdown(memo.content || '', state.searchQuery)}</div>
@@ -2864,17 +2886,17 @@
     bindEvents();
     updatePublishAuthUI();
 
-    // 并行加载：用户画像与内容列表同时请求，避免串行等待，显著提升首屏速度
-    // - 有缓存时：两者各自从缓存立即恢复，首屏近乎瞬开
-    // - 无缓存时：两个网络请求并行，比串行快一倍
-    Promise.all([
-      loadUserProfile(),
-      loadInitial()
-    ]).then(() => {
+    // 首屏关键路径:只等内容列表(loadInitial),用户画像后台加载不阻塞
+    // - loadInitial 优先渲染首屏(头像/昵称用 fallback)
+    // - loadUserProfile 后台完成后批量更新 DOM
+    // 这样首屏只依赖一个网络请求(/memos),而非两个(/memos + /users)
+    loadInitial().then(() => {
       initInfiniteScroll();
       initRealTimeUpdates();
       scrollToHashMemo();
     });
+    // 用户画像完全后台,不阻塞首屏
+    loadUserProfile();
     window.addEventListener('hashchange', () => scrollToHashMemo());
     registerServiceWorker();
   }
