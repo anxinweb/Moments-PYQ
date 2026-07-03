@@ -631,13 +631,13 @@
 
   // ==================== Memos API ====================
 
-  async function fetchMemos(pageToken) {
+  async function fetchMemos(pageToken, pageSize = 200) {
     const params = new URLSearchParams();
     // 游客只获取公开内容；登录后不设 filter 让 API 返回所有可见性内容
     if (state.isGuest) {
       params.set('filter', 'visibility == "PUBLIC"');
     }
-    params.set('page_size', String(200));
+    params.set('page_size', String(pageSize));
     params.set('order_by', 'pinned desc, create_time desc');
     if (pageToken) params.set('page_token', pageToken);
     return apiFetch('/memos', {}, params.toString());
@@ -1474,17 +1474,27 @@
         newMemos = filtered.slice(state.loadedCount, state.loadedCount + CONFIG.PAGE_SIZE);
       }
       // 2) 本地数据不够,且有 nextPageToken:直接调 API 拉下一页(不等后台补全)
+      //    用 PAGE_SIZE 而非 200,只拉需要的一页,快速且省流量
       else if (state.nextPageToken) {
-        const data = await fetchMemos(state.nextPageToken);
-        const fetched = (data.memos || []).filter(m => state.isGuest ? isPublicMemo(m) : true);
-        state.nextPageToken = data.nextPageToken || data.next_page_token || '';
-        // 去重后追加到 allPublicMemos
-        const existing = new Set(state.allPublicMemos.map(m => m.name));
-        const fresh = fetched.filter(m => !existing.has(m.name));
-        state.allPublicMemos.push(...fresh);
-        // 重新过滤并切片(可能有 searchQuery/activeTag 过滤)
-        const newFiltered = getFilteredMemos();
-        newMemos = newFiltered.slice(state.loadedCount, state.loadedCount + CONFIG.PAGE_SIZE);
+        // 取出当前 token,立即清空,避免后台补全用同一 token 重复拉取
+        const tokenToUse = state.nextPageToken;
+        state.nextPageToken = '';
+        try {
+          const data = await fetchMemos(tokenToUse, CONFIG.PAGE_SIZE);
+          state.nextPageToken = data.nextPageToken || data.next_page_token || '';
+          const fetched = (data.memos || []).filter(m => state.isGuest ? isPublicMemo(m) : true);
+          // 去重后追加到 allPublicMemos(供搜索/统计使用)
+          const existing = new Set(state.allPublicMemos.map(m => m.name));
+          const fresh = fetched.filter(m => !existing.has(m.name));
+          state.allPublicMemos.push(...fresh);
+          // 重新过滤并切片(可能有 searchQuery/activeTag 过滤)
+          const newFiltered = getFilteredMemos();
+          newMemos = newFiltered.slice(state.loadedCount, state.loadedCount + CONFIG.PAGE_SIZE);
+        } catch (fetchErr) {
+          // 拉取失败:恢复 token,让用户可重试
+          state.nextPageToken = tokenToUse;
+          throw fetchErr;
+        }
       }
 
       state.loadedCount += newMemos.length;

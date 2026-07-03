@@ -48,15 +48,19 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 静态资源：Network First
+  // 静态资源:Cache First(命中即返回,毫秒级),后台静默更新
+  // 比 Network First 更快,适合静态资源(JS/CSS/图标/字体)
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (!response || response.status !== 200) return response;
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy).catch(() => {}));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+    caches.match(event.request).then(cached => {
+      const fetchPromise = fetch(event.request)
+        .then(response => {
+          if (!response || response.status !== 200) return response;
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy).catch(() => {}));
+          return response;
+        })
+        .catch(() => cached);
+      return cached || fetchPromise;
+    })
   );
 });
