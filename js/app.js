@@ -46,6 +46,8 @@
     visibilityFilter: 'all',  // 'all' | 'PUBLIC' | 'PROTECTED' | 'PRIVATE'
     hashView: false,           // 当前是否为单条链接视图
     hashViewMemo: null,        // 单条视图的 memo 数据
+    // 后台分页补全:首屏只拉第一页立即渲染,剩余在后台异步拉取
+    backgroundFetchPromise: null,
     // 分页
     paginationPage: 1,
     paginationTotalPages: 1,
@@ -639,6 +641,35 @@
     return apiFetch('/memos', {}, params.toString());
   }
 
+  // 后台分页补全:从指定 pageToken 继续拉取剩余 memo,填充 allPublicMemos
+  // 用于搜索/统计/翻页,不阻塞首屏渲染
+  function startBackgroundFetch(pageToken) {
+    if (state.backgroundFetchPromise || !pageToken) return;
+    state.backgroundFetchPromise = (async () => {
+      try {
+        let token = pageToken;
+        let maxPages = 10;
+        while (token && maxPages > 0) {
+          maxPages--;
+          const data = await fetchMemos(token);
+          const more = (data.memos || []).filter(m => state.isGuest ? isPublicMemo(m) : true);
+          // 去重(防止 silentRefresh 已 unshift 的新内容重复)
+          const existing = new Set(state.allPublicMemos.map(m => m.name));
+          const fresh = more.filter(m => !existing.has(m.name));
+          state.allPublicMemos.push(...fresh);
+          fresh.forEach(m => existing.add(m.name));
+          token = data.nextPageToken || data.next_page_token || '';
+        }
+        collectTags();
+        cacheManager.memos = state.allPublicMemos;
+      } catch (e) {
+        console.warn('Background fetch failed:', e);
+      } finally {
+        state.backgroundFetchPromise = null;
+      }
+    })();
+  }
+
   async function fetchAllPublicMemos(force = false) {
     // 尝试从缓存恢复
     if (!force && state.allPublicMemos.length === 0) {
@@ -659,20 +690,23 @@
     }
     if (!force && state.allPublicMemos.length > 0) return state.allPublicMemos;
 
-    const all = [];
-    let pageToken = '';
-    let maxPages = 10;
-    do {
-      maxPages--;
-      if (maxPages < 0) break;
-      const data = await fetchMemos(pageToken);
-      all.push(...(data.memos || []).filter(memo => state.isGuest ? isPublicMemo(memo) : true));
-      pageToken = data.nextPageToken || data.next_page_token || '';
-    } while (pageToken);
-    state.allPublicMemos = all.filter(memo => state.isGuest ? isPublicMemo(memo) : true);
-    // 写入缓存
-    cacheManager.memos = state.allPublicMemos;
+    // 首屏快速模式:只拉第一页(PAGE_SIZE 条)立即返回,剩余后台补全
+    // 首屏只等 ~20 条而非全量(可能数百~数千条),显著提速
+    const firstParams = new URLSearchParams();
+    if (state.isGuest) firstParams.set('filter', 'visibility == "PUBLIC"');
+    firstParams.set('page_size', String(CONFIG.PAGE_SIZE));
+    firstParams.set('order_by', 'pinned desc, create_time desc');
+    const firstData = await apiFetch('/memos', {}, firstParams.toString());
+    const firstMemos = (firstData.memos || []).filter(memo => state.isGuest ? isPublicMemo(memo) : true);
+    state.allPublicMemos = firstMemos;
     collectTags();
+    cacheManager.memos = state.allPublicMemos;
+
+    // 后台补全剩余(用于搜索/统计/翻页),不阻塞首屏
+    const nextToken = firstData.nextPageToken || firstData.next_page_token || '';
+    if (nextToken) {
+      startBackgroundFetch(nextToken);
+    }
     return state.allPublicMemos;
   }
 
@@ -1270,7 +1304,8 @@
       state.paginationTotalPages = totalPages;
       state.memos = filtered.slice(0, CONFIG.PAGE_SIZE);
       state.loadedCount = state.memos.length;
-      state.hasMore = filtered.length > state.loadedCount;
+      // hasMore:本地数据未显示完,或后台仍在补全(补全后可能还有更多页)
+      state.hasMore = filtered.length > state.loadedCount || !!state.backgroundFetchPromise;
 
       dom.skeletonWrap.style.display = 'none';
 
@@ -1285,9 +1320,21 @@
       }
 
       renderCards(state.memos);
-      loadReactions(state.memos);
-      loadLinkPreviews(state.memos);
       initLazyLoad();
+
+      // 延迟发起 reactions / link previews 请求,避免与首屏图片加载竞争带宽
+      // 首屏渲染完、浏览器空闲后再拉取这些次要数据
+      const deferHeavyFetch = (fn) => {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => fn(), { timeout: 3000 });
+        } else {
+          setTimeout(fn, 600);
+        }
+      };
+      deferHeavyFetch(() => {
+        loadReactions(state.memos);
+        loadLinkPreviews(state.memos);
+      });
 
       updatePaginationUI();
 
@@ -1322,6 +1369,13 @@
     try {
       const data = await fetchMemos('');
       const freshMemos = data.memos || [];
+
+      // 如果后端还有更多历史分页未补全,触发后台补全(覆盖缓存不完整的情况)
+      const nextToken = data.nextPageToken || data.next_page_token || '';
+      if (nextToken && !state.backgroundFetchPromise) {
+        startBackgroundFetch(nextToken);
+      }
+
       if (freshMemos.length === 0 || state.allPublicMemos.length === 0) return;
 
       // 用 name 集合精确判断：只有之前完全不存在的 memo 才算"新增"
@@ -1359,7 +1413,7 @@
           dom.memoList.prepend(frag);
           state.memos = filtered.slice(0, CONFIG.PAGE_SIZE);
           state.loadedCount = state.memos.length;
-          state.hasMore = filtered.length > state.loadedCount;
+          state.hasMore = filtered.length > state.loadedCount || !!state.backgroundFetchPromise;
           loadReactions(visibleNew);
           loadLinkPreviews(visibleNew);
         }
@@ -1381,10 +1435,14 @@
     dom.loadMoreClickBtn.disabled = true;
 
     try {
+      // 后台仍在补全历史分页时,先等它完成,避免取到空切片
+      if (state.backgroundFetchPromise) {
+        await state.backgroundFetchPromise;
+      }
       const filtered = getFilteredMemos();
       const newMemos = filtered.slice(state.loadedCount, state.loadedCount + CONFIG.PAGE_SIZE);
       state.loadedCount += newMemos.length;
-      state.hasMore = filtered.length > state.loadedCount;
+      state.hasMore = filtered.length > state.loadedCount || !!state.backgroundFetchPromise;
 
       if (newMemos.length === 0) {
         state.hasMore = false;
