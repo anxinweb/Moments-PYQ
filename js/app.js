@@ -118,6 +118,10 @@
     },
     get memos() { return this.get('memos', CACHE_MAX_AGE); },
     set memos(data) { this.set('memos', data); },
+    // 缓存 nextPageToken:刷新后恢复,确保 loadMore 能继续调 API 拉下一页
+    // 否则缓存恢复后 nextPageToken 为空,loadMore 只能用本地 slice,缓存不完整时误判"已经到底"
+    get nextPageToken() { return this.get('nextPageToken', CACHE_MAX_AGE); },
+    set nextPageToken(data) { this.set('nextPageToken', data); },
     get tags() { return this.get('tags', CACHE_MAX_AGE); },
     set tags(data) { this.set('tags', data); },
     get reactions() { return this.get('reactions', CACHE_MAX_AGE); },
@@ -682,6 +686,10 @@
         }
         collectTags();
         cacheManager.memos = state.allPublicMemos;
+        // 后台补全完成后,所有页已拉取完毕,nextPageToken 应为空
+        // 同步清空缓存,下次刷新恢复时不会重复触发补全(allPublicMemos 已完整)
+        // 注意:不修改 state.nextPageToken,因为 loadMore 可能正在使用它
+        cacheManager.nextPageToken = '';
       } catch (e) {
         console.warn('Background fetch failed:', e);
       } finally {
@@ -696,6 +704,13 @@
       const cached = cacheManager.memos;
       if (cached && Array.isArray(cached) && cached.length > 0) {
         state.allPublicMemos = cached;
+        // 恢复 nextPageToken:缓存恢复时必须同步恢复 token,否则 loadMore 无法调 API
+        // 拉下一页,只能用本地 slice。若缓存不完整会误判"已经到底"
+        state.nextPageToken = cacheManager.nextPageToken || '';
+        // 如果还有下一页,触发后台补全(缓存可能不完整,继续拉取剩余)
+        if (state.nextPageToken && !state.backgroundFetchPromise) {
+          startBackgroundFetch(state.nextPageToken);
+        }
         // 同时恢复标签缓存
         const cachedTags = cacheManager.tags;
         if (cachedTags) {
@@ -721,6 +736,8 @@
     state.allPublicMemos = firstMemos;
     // 保存下一页 token,loadMore 直接用它调 API,不等后台补全
     state.nextPageToken = firstData.nextPageToken || firstData.next_page_token || '';
+    // 同步缓存 token,刷新后可恢复
+    cacheManager.nextPageToken = state.nextPageToken;
     collectTags();
     cacheManager.memos = state.allPublicMemos;
 
@@ -1417,16 +1434,13 @@
   }
 
   // 后台静默刷新：精确检测真正的新 memo 并增量插入
+  // 只拉第一页 PAGE_SIZE 条,对比已有内容判断是否真的有新发布
+  // 不能用 200:否则会把缓存未补全的分页数据误判为"新内容",破坏排序
   async function silentRefresh() {
     try {
-      const data = await fetchMemos('');
+      // 只拉第一页,检测用户刷新后是否有人发布了新内容
+      const data = await fetchMemos('', CONFIG.PAGE_SIZE);
       const freshMemos = data.memos || [];
-
-      // 如果后端还有更多历史分页未补全,触发后台补全(覆盖缓存不完整的情况)
-      const nextToken = data.nextPageToken || data.next_page_token || '';
-      if (nextToken && !state.backgroundFetchPromise) {
-        startBackgroundFetch(nextToken);
-      }
 
       if (freshMemos.length === 0 || state.allPublicMemos.length === 0) return;
 
@@ -1436,8 +1450,9 @@
 
       if (trulyNew.length === 0) return; // 没有真正的新内容
 
-      // 按 API 返回顺序（即 pinned desc, create_time desc）prepend 新 memo
-      for (const m of trulyNew.reverse()) {
+      // trulyNew 已是 API 返回顺序(pinned desc, create_time desc),最新在前
+      // 直接 unshift 到 allPublicMemos 顶部,保持时间排序
+      for (const m of trulyNew) {
         state.allPublicMemos.unshift(m);
         existingNames.add(m.name);
       }
@@ -1454,17 +1469,20 @@
         });
         if (visibleNew.length > 0) {
           const frag = document.createDocumentFragment();
-          visibleNew.reverse().forEach(m => {
+          // visibleNew 已是最新在前,按顺序 append 到 frag,再 prepend 到 DOM
+          visibleNew.forEach(m => {
             const card = renderMemoCard(m);
             if (card) {
               card.style.animation = 'none';
               card.style.opacity = '1';
-              frag.prepend(card);
+              frag.appendChild(card);
             }
           });
           dom.memoList.prepend(frag);
-          state.memos = filtered.slice(0, CONFIG.PAGE_SIZE);
-          state.loadedCount = state.memos.length;
+          // 同步更新 state.memos 和 loadedCount,保持 DOM 与状态一致
+          // 不能 slice(0, PAGE_SIZE):那样 DOM 卡片数与 state.memos 不一致
+          state.memos = [...visibleNew, ...state.memos];
+          state.loadedCount += visibleNew.length;
           state.hasMore = filtered.length > state.loadedCount || !!state.nextPageToken;
           if (CONFIG.ENABLE_REACTIONS_FETCH) loadReactions(visibleNew);
           loadLinkPreviews(visibleNew);
@@ -1503,6 +1521,8 @@
         try {
           const data = await fetchMemos(tokenToUse, CONFIG.PAGE_SIZE);
           state.nextPageToken = data.nextPageToken || data.next_page_token || '';
+          // 同步缓存 token,刷新后可恢复到正确位置
+          cacheManager.nextPageToken = state.nextPageToken;
           const fetched = (data.memos || []).filter(m => state.isGuest ? isPublicMemo(m) : true);
           // 去重后追加到 allPublicMemos(供搜索/统计使用)
           const existing = new Set(state.allPublicMemos.map(m => m.name));
@@ -3075,6 +3095,12 @@
       initInfiniteScroll();
       initRealTimeUpdates();
       scrollToHashMemo();
+      // 刷新后回到顶部:manual 模式下浏览器不恢复滚动位置
+      // 但首屏 DOM 异步重建,需在渲染完成后显式滚动到顶部
+      // 否则可能停留在刷新前的滚动位置(如第二页区域),看到的内容不是第一页第一条
+      if (!window.location.hash) {
+        window.scrollTo(0, 0);
+      }
     });
     // 用户画像完全后台,不阻塞首屏
     loadUserProfile();
