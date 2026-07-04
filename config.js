@@ -65,7 +65,7 @@ const CONFIG = {
   // ╚══════════════════════════════════════╝
 
   // 'luxury' | 'atelier' | 'graphite' | 'paper' | 'parchment' | 'linen' | 'wechat' | 'qzone'
-  THEME_PRESET: 'wechat',
+  THEME_PRESET: 'qzone',
 
   // 'system' 跟随系统 | 'light' 固定亮色 | 'dark' 固定暗色 | 'schedule' 按时间
   DARK_MODE_STRATEGY: 'light',
