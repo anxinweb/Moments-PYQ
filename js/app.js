@@ -229,7 +229,7 @@
     return '/api/proxy';
   }
 
-  function apiUrl(path, queryStr) {
+  function apiUrl(path, queryStr, method = 'GET') {
     if (state.directApiMode) {
       let url = CONFIG.MEMOS_URL + CONFIG.API_PREFIX + path;
       if (queryStr) url += '?' + queryStr;
@@ -238,7 +238,8 @@
     // 游客 GET 请求直连 memos,绕过 Vercel Serverless 冷启动(可达 12 秒)
     // 登录用户的请求(含 token)仍走 proxy,保护凭证不暴露
     // 仅对无副作用的 GET 请求生效,POST/PATCH/DELETE 仍走 proxy
-    if (CONFIG.DIRECT_GET_FOR_GUEST && state.isGuest && !state.publishToken) {
+    // 注意:/auth/login 是 proxy 自定义路径,memos 无此接口,必须走 proxy
+    if (CONFIG.DIRECT_GET_FOR_GUEST && method === 'GET' && state.isGuest && !state.publishToken && path !== '/auth/login') {
       let url = CONFIG.MEMOS_URL + CONFIG.API_PREFIX + path;
       if (queryStr) url += '?' + queryStr;
       return url;
@@ -256,8 +257,8 @@
   }
 
   async function apiFetch(path, options = {}, queryStr = '') {
-    const url = apiUrl(path, queryStr);
     const method = (options.method || 'GET').toUpperCase();
+    const url = apiUrl(path, queryStr, method);
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
