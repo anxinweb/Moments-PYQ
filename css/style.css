@@ -1420,6 +1420,31 @@ button {
   stroke-linejoin: round;
 }
 
+/* "在 Memos 中打开"菜单项 */
+.memo-menu-original {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+
+.memo-menu-original:hover {
+  background: var(--bg-hover);
+  color: var(--color-primary);
+}
+
+.memo-menu-original svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 /* ---------- Memo 内容 ---------- */
 .memo-content {
   font-size: 14.5px;

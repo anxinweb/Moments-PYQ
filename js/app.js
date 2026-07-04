@@ -1119,9 +1119,11 @@
     const reactions = state.allReactions[memo.name] || [];
     const reactionsHtml = renderReactionsHtml(memo.name, reactions);
 
-    // 分享
+    // 分享链接:指向前端单条视图(hash 路由)
     const shareUrl = `${window.location.origin}${window.location.pathname}#memo-${id}`;
-    const memoUrl = getMemoOriginalUrl(memo);
+    // 时间链接:也指向前端单条视图,点击时间在当前页打开单条视图
+    // (旧逻辑指向 memos 后端,用户体验不佳,现改为前端 hash 路由)
+    const memoUrl = shareUrl;
 
     // 展开收起（长内容）
     const visibleContent = hideContentTags(memo.content || '');
@@ -1164,7 +1166,7 @@
             </button>
           </div>
           <div class="memo-footer-meta">
-            <div class="memo-footer-info"><a class="memo-time memo-time-link" href="${memoUrl}" target="_blank" rel="noopener noreferrer" title="在 Memos 中打开：${formatDate(createTime)}">${time}</a>${locationHtml}</div>
+            <div class="memo-footer-info"><a class="memo-time memo-time-link" href="${memoUrl}" title="查看单条：${formatDate(createTime)}">${time}</a>${locationHtml}</div>
             <div class="memo-footer-tools">
               <button class="memo-more" title="更多操作" aria-label="更多操作" data-menu-for="${id}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1176,8 +1178,12 @@
               <div class="memo-more-menu" data-menu="${id}">
                 <button class="memo-menu-share" type="button" data-url="${shareUrl}">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5 15.4 17.5M15.4 6.5 8.6 10.5"/></svg>
-                  <span>复制分享</span>
+                  <span>复制分享链接</span>
                 </button>
+                <a class="memo-menu-original" href="${getMemoOriginalUrl(memo)}" target="_blank" rel="noopener noreferrer">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  <span>在 Memos 中打开</span>
+                </a>
               </div>
             </div>
           </div>
