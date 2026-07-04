@@ -275,6 +275,14 @@
     return CONFIG.MEMOS_URL + '/file/' + attachmentName + '/' + encodeURIComponent(filename) + suffix;
   }
 
+  // 获取附件的 R2 原链接(externalLink),用于原图/音视频/文件直接访问
+  // 优于经过 memos /file/ 代理:直连 R2 更快,且不消耗 memos/vercel 带宽
+  // 若无 externalLink(如本地存储模式),回退到 fileUrl
+  function attachmentOriginalUrl(attachment) {
+    if (attachment && attachment.externalLink) return attachment.externalLink;
+    return fileUrl(attachment.name, attachment.filename);
+  }
+
   function normalizeMemosUrl(url) {
     if (!url) return '';
     if (/^(https?:|data:|blob:)/i.test(url)) return url;
@@ -1031,7 +1039,8 @@
       const gridClass = `count-${shownCount}${shownCount === 1 ? ' single' : ''}`;
       imagesHtml = `<div class="memo-images ${gridClass}" data-total="${imageAttachments.length}">`;
       shownImages.forEach((img, idx) => {
-        const fullUrl = fileUrl(img.name, img.filename);
+        // 原图用 R2 原链接(externalLink),缩略图仍走 memos(小、快)
+        const fullUrl = attachmentOriginalUrl(img);
         const thumbUrl = fileUrl(img.name, img.filename, { thumbnail: true });
         // 最后一张显示溢出指示
         const overflowHtml = (idx === maxShow - 1 && imageAttachments.length > maxShow)
@@ -1168,7 +1177,8 @@
   function renderAttachmentCards(attachments) {
     if (!attachments || attachments.length === 0) return '';
     const cards = attachments.map(file => {
-      const url = fileUrl(file.name, file.filename);
+      // 音视频/文件直接用 R2 原链接(externalLink),不经 memos 代理,更快且省带宽
+      const url = attachmentOriginalUrl(file);
       const type = file.type || 'application/octet-stream';
       const name = escapeHtml(file.filename || file.name || '附件');
       const size = file.size ? `<span>${formatFileSize(Number(file.size))}</span>` : '';
@@ -1195,7 +1205,8 @@
           </div>
         </div>`;
       }
-      return `<a class="attachment-card attachment-file" href="${url}" download="${name}">
+      // 文件附件:直接打开 R2 原链接,而非下载(去掉 download 属性)
+      return `<a class="attachment-card attachment-file" href="${url}" target="_blank" rel="noopener">
         <div class="attachment-icon attachment-icon-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg></div>
         <div class="attachment-info"><strong>${name}</strong><span>${escapeHtml(type)}</span>${size}</div>
       </a>`;
@@ -2083,7 +2094,7 @@
       map[mid] = (memo.attachments || [])
         .filter(a => a.type && a.type.startsWith('image/'))
         .map((img, index) => ({
-          src: fileUrl(img.name, img.filename),
+          src: attachmentOriginalUrl(img),
           index,
         }));
     });
