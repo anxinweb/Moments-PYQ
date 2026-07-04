@@ -235,6 +235,14 @@
       if (queryStr) url += '?' + queryStr;
       return url;
     }
+    // 游客 GET 请求直连 memos,绕过 Vercel Serverless 冷启动(可达 12 秒)
+    // 登录用户的请求(含 token)仍走 proxy,保护凭证不暴露
+    // 仅对无副作用的 GET 请求生效,POST/PATCH/DELETE 仍走 proxy
+    if (CONFIG.DIRECT_GET_FOR_GUEST && state.isGuest && !state.publishToken) {
+      let url = CONFIG.MEMOS_URL + CONFIG.API_PREFIX + path;
+      if (queryStr) url += '?' + queryStr;
+      return url;
+    }
     if (CONFIG.USE_PROXY) {
       const proxyBase = getProxyBase();
       let url = `${proxyBase}?path=` + encodeURIComponent(path);
@@ -1353,8 +1361,18 @@
     // 如果有缓存，先隐藏骨架屏，后续用缓存数据立即渲染
     if (isCacheValid) {
       dom.skeletonWrap.style.display = 'none';
-    } else if (dom.memoList.children.length === 0) {
+    } else {
+      // 无缓存或强制刷新:必须显示骨架屏,避免 DOM 清空后页面空白
+      // (forceRefresh 时 DOM 已有卡片,但我们要清空重建,必须显示骨架屏)
       dom.skeletonWrap.style.display = '';
+    }
+
+    // forceRefresh 时清理旧状态,避免后台补全 promise 往新数组 push 旧数据
+    if (forceRefresh) {
+      state.allPublicMemos = [];
+      state.nextPageToken = '';
+      state.backgroundFetchPromise = null;
+      state.cacheRestored = false;
     }
 
     dom.memoList.innerHTML = '';
@@ -2800,6 +2818,12 @@
       exitHashView();
       return;
     }
+
+    // 判断是否真的需要重新拉取数据
+    // 只有存在搜索/标签/日期/可见性过滤时才需要 forceRefresh
+    // 否则只需滚动到顶部,避免无谓的 API 请求和页面闪烁
+    const hasFilter = state.searchQuery || state.activeTag !== 'all' || state.activeDate || state.visibilityFilter !== 'all';
+
     state.activeTag = 'all';
     state.searchQuery = '';
     state.activeDate = '';
@@ -2811,8 +2835,18 @@
     document.querySelectorAll('.vis-filter-chip.active').forEach(el => el.classList.remove('active'));
     const allVisChip = document.querySelector('.vis-filter-chip[data-vis="all"]');
     if (allVisChip) allVisChip.classList.add('active');
+    // 更新标签栏激活态
+    document.querySelectorAll('.tag-chip.active').forEach(el => el.classList.remove('active'));
+    const allTagChip = document.querySelector('.tag-chip[data-tag="all"]');
+    if (allTagChip) allTagChip.classList.add('active');
+
     if (window.location.hash) history.replaceState(null, '', window.location.pathname + window.location.search);
-    loadInitial(true);
+
+    if (hasFilter) {
+      // 有过滤条件:需要重新渲染(用本地已缓存的数据,不强制拉 API)
+      loadInitial(false);
+    }
+    // 无过滤条件:数据已是全部,只需滚动到顶部,不触发重新加载
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 

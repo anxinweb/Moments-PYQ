@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ahxin-moments-v11';
+const CACHE_NAME = 'ahxin-moments-v12';
 // 首次访问只预缓存最核心的 HTML,其余资源靠运行时缓存自动积累
 // 避免 install 阶段并发 fetch 9 个文件,与首屏资源竞争带宽
 const APP_SHELL = [
