@@ -65,10 +65,10 @@ const CONFIG = {
   // ╚══════════════════════════════════════╝
 
   // 'luxury' | 'atelier' | 'graphite' | 'paper' | 'parchment' | 'linen' | 'wechat' | 'qzone'
-  THEME_PRESET: 'luxury',
+  THEME_PRESET: 'wechat',
 
   // 'system' 跟随系统 | 'light' 固定亮色 | 'dark' 固定暗色 | 'schedule' 按时间
-  DARK_MODE_STRATEGY: 'system',
+  DARK_MODE_STRATEGY: 'light',
   THEME_ALLOW_USER_OVERRIDE: true,                //   是否允许用户前台手动切换明暗
   DARK_MODE_START: '19:00',                       //   schedule 模式：暗色开始时间
   DARK_MODE_END: '07:00',                         //   schedule 模式：暗色结束时间
@@ -98,7 +98,7 @@ const CONFIG = {
 
   REACTION_EMOJIS: ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '💯'],
   ENABLE_REACTIONS_FETCH: false,                  //   是否首屏拉取 reactions(20条×1请求,慢),false=点击时才拉取
-  SEARCH_DEBOUNCE: 300,                          //   搜索防抖 ms
+  SEARCH_DEBOUNCE: 150,                          //   搜索防抖 ms
   ENABLE_STATS: true,                            //   是否启用统计面板
 
   // ╔══════════════════════════════════════╗
