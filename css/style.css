@@ -1590,6 +1590,7 @@ button {
   overflow: hidden;
   width: fit-content;
   max-width: 100%;
+  /* 桌面端默认:固定 px 列宽,width: fit-content 让网格刚好包裹 */
   --moment-image-size: clamp(96px, 27vw, 150px);
 }
 .memo-images.single {
@@ -1600,7 +1601,9 @@ button {
 .memo-images.count-2 {
   grid-template-columns: repeat(2, var(--moment-image-size));
 }
+/* 3 张图:用更大尺寸(与九宫格区分),桌面端最大 180px */
 .memo-images.count-3 {
+  --moment-image-size: clamp(120px, 33vw, 180px);
   grid-template-columns: repeat(3, var(--moment-image-size));
 }
 .memo-images.count-4 {
@@ -1617,7 +1620,8 @@ button {
 .memo-image-wrap {
   position: relative;
   aspect-ratio: 1;
-  width: var(--moment-image-size);
+  width: 100%;
+  min-width: 0;
   overflow: hidden;
   cursor: pointer;
   background: var(--bg-hover);
@@ -3448,12 +3452,38 @@ button {
   }
 
   .memo-images {
-    --moment-image-size: clamp(76px, calc((100vw - 72px) / 3), 108px);
     gap: 3px;
   }
 
+  /* 手机端多图:用 1fr 自动填满容器宽度,避免最后一列被挤压 */
+  /* width: 100% 覆盖默认 fit-content,让 1fr 有实际宽度可分配 */
+  /* 限制网格最大宽度,让 2/3 张图不至于占满整行 */
   .memo-images.count-2 {
-    --moment-image-size: clamp(104px, calc((100vw - 72px) / 2), 148px);
+    width: 100%;
+    grid-template-columns: repeat(2, 1fr);
+    max-width: calc((100vw - 76px) * 0.62);
+  }
+
+  .memo-images.count-3 {
+    width: 100%;
+    grid-template-columns: repeat(3, 1fr);
+    max-width: calc((100vw - 76px) * 0.78);
+  }
+
+  .memo-images.count-4 {
+    width: 100%;
+    grid-template-columns: repeat(2, 1fr);
+    max-width: calc((100vw - 76px) * 0.62);
+  }
+
+  .memo-images.count-5,
+  .memo-images.count-6,
+  .memo-images.count-7,
+  .memo-images.count-8,
+  .memo-images.count-9 {
+    width: 100%;
+    grid-template-columns: repeat(3, 1fr);
+    max-width: 100%;
   }
 
   .memo-images.single .memo-image-wrap,
@@ -3598,8 +3628,32 @@ button {
     padding: calc(var(--nav-height) + 14px) 14px 70px;
   }
 
-  .memo-images {
-    --moment-image-size: clamp(112px, calc((100vw - 104px) / 3), 145px);
+  .memo-images.count-2 {
+    width: 100%;
+    grid-template-columns: repeat(2, 1fr);
+    max-width: calc((100vw - 104px) * 0.62);
+  }
+
+  .memo-images.count-3 {
+    width: 100%;
+    grid-template-columns: repeat(3, 1fr);
+    max-width: calc((100vw - 104px) * 0.78);
+  }
+
+  .memo-images.count-4 {
+    width: 100%;
+    grid-template-columns: repeat(2, 1fr);
+    max-width: calc((100vw - 104px) * 0.62);
+  }
+
+  .memo-images.count-5,
+  .memo-images.count-6,
+  .memo-images.count-7,
+  .memo-images.count-8,
+  .memo-images.count-9 {
+    width: 100%;
+    grid-template-columns: repeat(3, 1fr);
+    max-width: 100%;
   }
 }
 
