@@ -68,7 +68,7 @@ const CONFIG = {
   THEME_PRESET: 'qzone',
 
   // 'system' 跟随系统 | 'light' 固定亮色 | 'dark' 固定暗色 | 'schedule' 按时间
-  DARK_MODE_STRATEGY: 'light',
+  DARK_MODE_STRATEGY: 'linen',
   THEME_ALLOW_USER_OVERRIDE: true,                //   是否允许用户前台手动切换明暗
   DARK_MODE_START: '19:00',                       //   schedule 模式：暗色开始时间
   DARK_MODE_END: '07:00',                         //   schedule 模式：暗色结束时间
@@ -89,7 +89,7 @@ const CONFIG = {
   MAX_IMAGES_PER_MEMO: 9,                        //   每条最多显示几张图片
   SINGLE_IMAGE_MAX_WIDTH: '260px',               //   单图最大宽度
   SINGLE_IMAGE_MAX_HEIGHT: '360px',              //   单图最大高度
-  CONTENT_COLLAPSE_THRESHOLD: 150,               //   超此字符数自动折叠，0 不折叠
+  CONTENT_COLLAPSE_THRESHOLD: 260,               //   超此字符数自动折叠，0 不折叠
   LAZY_LOAD_OFFSET: 200,                         //   图片懒加载提前像素
 
   // ╔══════════════════════════════════════╗
