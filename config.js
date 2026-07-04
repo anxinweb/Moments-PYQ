@@ -65,10 +65,10 @@ const CONFIG = {
   // ╚══════════════════════════════════════╝
 
   // 'luxury' | 'atelier' | 'graphite' | 'paper' | 'parchment' | 'linen' | 'wechat' | 'qzone'
-  THEME_PRESET: 'qzone',
+  THEME_PRESET: 'linen',
 
   // 'system' 跟随系统 | 'light' 固定亮色 | 'dark' 固定暗色 | 'schedule' 按时间
-  DARK_MODE_STRATEGY: 'linen',
+  DARK_MODE_STRATEGY: 'light',
   THEME_ALLOW_USER_OVERRIDE: true,                //   是否允许用户前台手动切换明暗
   DARK_MODE_START: '19:00',                       //   schedule 模式：暗色开始时间
   DARK_MODE_END: '07:00',                         //   schedule 模式：暗色结束时间
