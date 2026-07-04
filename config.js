@@ -33,11 +33,11 @@ const CONFIG = {
 
   // -- Logo ——
   SHOW_SITE_LOGO: false,                         //   是否显示左上角图片 Logo
-  SITE_LOGO_URL: './assets/faviconpyq.ico',       //   左上角 Logo 图片
+  SITE_LOGO_URL: './assets/favicon.ico',       //   左上角 Logo 图片
   SITE_LOGO_MAX_WIDTH: '32px',
   SITE_LOGO_MAX_HEIGHT: '32px',
   SITE_ICON_TEXT: '',                            //   Logo 文字（Logo 图片为空时显示）
-  FAVICON_URL: './assets/faviconpyq.ico',        //   浏览器标签页图标
+  FAVICON_URL: './assets/favicon.ico',        //   浏览器标签页图标
 
   // -- 用户 ——
   ADMIN_NICKNAME: 'ah新',                         // ◆ 前台展示昵称（留空则用 ADMIN_NAME）

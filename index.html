@@ -11,8 +11,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default-translucent">
   <meta name="apple-mobile-web-app-title" content="Ah新的朋友圈">
-  <link rel="icon" type="image/x-icon" href="./assets/faviconpyq.ico">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="./assets/pwa-180.png">
+  <link rel="icon" type="image/x-icon" href="./assets/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./assets/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png">
   <link rel="manifest" href="./manifest.webmanifest">
   <!-- 预连接到 Memos 实例，加速首次 API 与附件请求 -->
   <link rel="preconnect" href="https://memos.ahxin.cn" crossorigin>
@@ -67,9 +69,17 @@
   <!-- 导航栏 -->
   <header class="navbar" id="navbar">
     <div class="navbar-inner">
-      <div class="navbar-brand">
+      <div class="navbar-brand" id="navbarBrand">
         <span class="site-icon placeholder" id="siteIcon"></span>
         <h1 class="site-name" id="siteName"></h1>
+      </div>
+      <!-- 搜索框:导航栏内展开,不再向下推出 -->
+      <div class="search-bar" id="searchBar">
+        <div class="search-input-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="searchInput" placeholder="搜索内容..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" name="moments-search" enterkeyhint="search">
+          <button class="search-clear" id="searchClear" aria-label="清除搜索">&times;</button>
+        </div>
       </div>
       <div class="navbar-actions">
         <button class="nav-btn" id="btnSearch" title="搜索" aria-label="搜索">
@@ -88,14 +98,6 @@
           <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
           <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
-      </div>
-    </div>
-    <!-- 搜索框 -->
-    <div class="search-bar" id="searchBar">
-      <div class="search-input-wrap">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="search" id="searchInput" placeholder="搜索内容..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="search" name="moments-search" enterkeyhint="search">
-        <button class="search-clear" id="searchClear" aria-label="清除搜索">&times;</button>
       </div>
     </div>
   </header>

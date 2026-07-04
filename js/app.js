@@ -230,7 +230,9 @@
   }
 
   function apiUrl(path, queryStr, method = 'GET') {
-    if (state.directApiMode) {
+    // 本地预览(localhost)强制走 proxy——dev-server.js 支持完整 proxy,直连 memos 会 CORS 失败
+    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (state.directApiMode && !isLocalhost) {
       let url = CONFIG.MEMOS_URL + CONFIG.API_PREFIX + path;
       if (queryStr) url += '?' + queryStr;
       return url;
@@ -239,7 +241,8 @@
     // 登录用户的请求(含 token)仍走 proxy,保护凭证不暴露
     // 仅对无副作用的 GET 请求生效,POST/PATCH/DELETE 仍走 proxy
     // 注意:/auth/login 是 proxy 自定义路径,memos 无此接口,必须走 proxy
-    if (CONFIG.DIRECT_GET_FOR_GUEST && method === 'GET' && state.isGuest && !state.publishToken && path !== '/auth/login') {
+    // localhost 例外:dev-server 支持 proxy,直连 memos 会 CORS 失败
+    if (!isLocalhost && CONFIG.DIRECT_GET_FOR_GUEST && method === 'GET' && state.isGuest && !state.publishToken && path !== '/auth/login') {
       let url = CONFIG.MEMOS_URL + CONFIG.API_PREFIX + path;
       if (queryStr) url += '?' + queryStr;
       return url;
@@ -1783,6 +1786,7 @@
   async function scrollToHashMemo() {
     if (!window.location.hash.startsWith('#memo-')) return;
     const id = window.location.hash.replace('#memo-', '');
+    if (!id) return;
     state.hashView = true;
     // 隐藏筛选导航栏
     if (dom.tagsNav) dom.tagsNav.style.display = 'none';
@@ -1792,29 +1796,34 @@
     state.hasMore = false;
     dom.endState.style.display = 'none';
     dom.loadMore.style.display = 'none';
-    // 加载所有内容找目标 memo
-    await fetchAllPublicMemos(false);
-    const filtered = getFilteredMemos();
-    const target = filtered.find(memo => memoId(memo.name) === id);
+    // 单条视图:显示骨架屏,直接调 API 拉这一条 memo,不依赖本地缓存
+    // (旧逻辑从本地 allPublicMemos 查找,但本地可能只有前 20 条,找不到旧 memo)
+    dom.memoList.innerHTML = '';
+    dom.skeletonWrap.style.display = '';
+    let target = null;
+    try {
+      // memos API: GET /memos/{uid} (name 风格用 memos/{uid})
+      const data = await apiFetch(`/memos/${encodeURIComponent(id)}`);
+      // API 返回单条 memo 对象(不是数组)
+      target = Array.isArray(data) ? data[0] : (data.memos ? data.memos[0] : data);
+    } catch (err) {
+      console.warn('单条 memo 拉取失败:', err);
+    }
     if (target) {
       state.hashViewMemo = target;
       state.memos = [target];
       state.loadedCount = 1;
-      dom.memoList.innerHTML = '';
+      dom.skeletonWrap.style.display = 'none';
       renderCards(state.memos);
       if (CONFIG.ENABLE_REACTIONS_FETCH) loadReactions(state.memos);
       loadLinkPreviews(state.memos);
       initLazyLoad();
-      // 平滑滚动到卡片
-      setTimeout(() => {
-        const card = document.getElementById(`memo-${id}`);
-        if (card) {
-          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
     } else {
-      // memo 未找到，退回到全部视图
-      exitHashView();
+      // memo 未找到,显示提示
+      dom.skeletonWrap.style.display = 'none';
+      dom.emptyState.style.display = '';
+      dom.emptyState.querySelector('.empty-text').textContent = '内容不存在';
+      dom.emptyState.querySelector('.empty-sub').textContent = '该内容可能已被删除或链接无效';
     }
   }
 
@@ -1953,17 +1962,18 @@
   }, CONFIG.SEARCH_DEBOUNCE);
 
   function toggleSearch(forceClose) {
+    const hadQuery = !!state.searchQuery || !!dom.searchInput.value;
     const isOpen = forceClose ? false : dom.searchBar.classList.toggle('open');
     if (forceClose) dom.searchBar.classList.remove('open');
     dom.btnSearch.classList.toggle('active', isOpen);
     if (isOpen) {
       dom.searchInput.focus();
     } else {
+      // 关闭搜索框:清空搜索内容,之前有搜索内容则刷新列表回到全部
       dom.searchInput.value = '';
       dom.searchClear.classList.remove('visible');
       state.searchQuery = '';
-      // 如果有关闭搜索框且之前有搜索结果，刷新列表
-      if (forceClose) loadInitial();
+      if (hadQuery) loadInitial();
     }
   }
 
@@ -2651,7 +2661,18 @@
       await loadInitial(true);
       showToast(mode === 'direct' ? '真实 Memos Token 登录成功，已切换直连模式' : '登录成功，可以发布内容了', 'success');
     } catch (err) {
-      showToast(err.message?.includes('Failed to fetch') ? '真实 Token 直连失败，请确认 Memos 已允许跨域访问' : 'Token 不正确或未配置', 'error', 4500);
+      // localhost 有 dev-server 支持 proxy,登录失败大概率是口令错误
+      const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      const msg = err.message || '';
+      if (isLocalhost && (msg.includes('Failed to fetch') || msg.includes('NetworkError'))) {
+        showToast('本地预览连接失败:请确认 dev-server 已启动且 .env.local 配置正确', 'error', 5000);
+      } else if (msg.includes('401') || msg.includes('Invalid')) {
+        showToast('口令不正确,请检查 .env.local 的 FRONTEND_PUBLISH_TOKEN', 'error', 4500);
+      } else if (!isLocalhost && msg.includes('Failed to fetch')) {
+        showToast('真实 Token 直连失败，请确认 Memos 已允许跨域访问', 'error', 4500);
+      } else {
+        showToast('口令不正确或未配置', 'error', 4500);
+      }
     } finally {
       dom.publishLoginBtn.disabled = false;
       dom.publishLoginBtn.textContent = '登录';
