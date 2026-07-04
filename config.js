@@ -89,7 +89,7 @@ const CONFIG = {
   MAX_IMAGES_PER_MEMO: 9,                        //   每条最多显示几张图片
   SINGLE_IMAGE_MAX_WIDTH: '260px',               //   单图最大宽度
   SINGLE_IMAGE_MAX_HEIGHT: '360px',              //   单图最大高度
-  CONTENT_COLLAPSE_THRESHOLD: 300,               //   超此字符数自动折叠，0 不折叠
+  CONTENT_COLLAPSE_THRESHOLD: 150,               //   超此字符数自动折叠，0 不折叠
   LAZY_LOAD_OFFSET: 200,                         //   图片懒加载提前像素
 
   // ╔══════════════════════════════════════╗
