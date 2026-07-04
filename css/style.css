@@ -2187,7 +2187,7 @@ button {
 
 /* ---------- 加载状态 ---------- */
 .load-more {
-  padding: 20px 0;
+  padding: 24px 0 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2228,7 +2228,7 @@ button {
 /* ---------- 空状态 / 结束状态 ---------- */
 .empty-state, .end-state {
   text-align: center;
-  padding: 40px 20px;
+  padding: 40px 20px 56px;
 }
 
 .empty-icon {
@@ -2636,9 +2636,11 @@ button {
   align-items: center;
   justify-content: center;
   animation: lightboxFadeIn 0.25s ease;
-  /* 触摸手势支持 */
-  touch-action: pan-y pinch-zoom;
+  /* 由 JS 完全控制手势:禁用浏览器原生缩放/滚动,避免与 JS 缩放冲突 */
+  touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: contain;
 }
 
 @keyframes lightboxFadeIn {
@@ -2706,13 +2708,19 @@ button {
 }
 
 .lightbox-img-wrap img {
-  max-width: 100%;
+  max-width: 90vw;
   max-height: 90vh;
   object-fit: contain;
   border-radius: 8px;
-  transition: opacity 0.2s, transform 0.3s ease;
-  /* 拖拽状态 */
+  /* transform 由 JS 实时控制(缩放/平移),不加动画以保证手势跟手 */
+  transition: opacity 0.2s ease;
+  cursor: zoom-in;
   -webkit-user-drag: none;
+  will-change: transform;
+  /* 图片加载失败时 alt 文案居中显示 */
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  text-align: center;
 }
 
 /* 图片加载指示 */
@@ -3335,7 +3343,8 @@ button {
 .load-more-click {
   display: flex;
   justify-content: center;
-  padding: 12px 0 20px;
+  /* 与标准网页对标:上下留白充足,底部更大,避免紧贴页面末尾 */
+  padding: 28px 0 56px;
 }
 .load-more-btn {
   height: 40px;

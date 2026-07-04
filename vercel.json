@@ -2,47 +2,32 @@
   "version": 2,
   "headers": [
     {
-      "source": "/(.*)\\.(html|webmanifest)",
+      "source": "/api/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        }
+        { "key": "Cache-Control", "value": "no-store" }
       ]
     },
     {
-      "source": "/assets/(.*)",
+      "source": "/(.*)\\.(html|webmanifest)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
       ]
     },
     {
       "source": "/(.*)\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
       ]
     },
     {
-      "source": "/api/(.*)",
+      "source": "/assets/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/proxy",
-      "destination": "/api/proxy.js"
-    }
+    { "source": "/api/proxy", "destination": "/api/proxy.js" }
   ],
   "env": {
     "MEMOS_URL": "https://memos.ahxin.cn"

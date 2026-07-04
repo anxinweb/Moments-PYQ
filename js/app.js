@@ -31,6 +31,16 @@
     lightboxTouchStartX: 0,
     lightboxTouchStartY: 0,
     lightboxSwipeHandled: false,
+    // 灯箱缩放/平移状态(支持双击放大、捏合缩放、拖拽平移、滚轮缩放)
+    lightboxScale: 1,
+    lightboxX: 0,
+    lightboxY: 0,
+    lightboxPinchStartDist: 0,
+    lightboxPinchStartScale: 1,
+    lightboxDragStartX: 0,
+    lightboxDragStartY: 0,
+    lightboxDragMoved: false,
+    lightboxMouseDown: false,
     loadedCount: 0,
     // 持久化登录：口令(proxy)永不过期，真实Token(direct)7天过期
     publishToken: (() => { try { const d = JSON.parse(localStorage.getItem('moments-publish-token')); if (!d) return ''; const expired = d.m === 'direct' && Date.now() - d.t > 7*86400000; return expired ? '' : d.v; } catch {} return ''; })(),
@@ -2085,7 +2095,7 @@
     dom.btnStats.classList.remove('active');
   }
 
-  // ==================== 灯箱（增强：触摸手势、加载过渡） ====================
+  // ==================== 灯箱（完整图片查看器：缩放/平移/手势/键盘） ====================
 
   function buildLightboxMap() {
     const map = {};
@@ -2107,19 +2117,45 @@
     state.lightboxIndex = index;
     if (state.lightboxImages.length === 0) return;
 
+    resetLightboxTransform();
     showLightboxImage();
     dom.lightbox.style.display = '';
     document.body.style.overflow = 'hidden';
+  }
+
+  // 应用缩放与平移到图片(实时响应手势,无需动画)
+  function applyLightboxTransform() {
+    const { lightboxScale: s, lightboxX: x, lightboxY: y } = state;
+    dom.lightboxImg.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    // 缩放时改变光标,提示可拖拽
+    dom.lightboxImg.style.cursor = s > 1 ? 'grab' : 'zoom-in';
+  }
+
+  // 重置缩放与平移(切换图片/关闭/双击还原时调用)
+  function resetLightboxTransform() {
+    state.lightboxScale = 1;
+    state.lightboxX = 0;
+    state.lightboxY = 0;
+    state.lightboxDragMoved = false;
+    dom.lightboxImg.style.transform = '';
+    dom.lightboxImg.style.cursor = 'zoom-in';
   }
 
   function showLightboxImage() {
     const img = state.lightboxImages[state.lightboxIndex];
     if (!img) return;
 
-    // 加载过渡
+    // 切换图片时重置缩放状态
+    resetLightboxTransform();
     dom.lightboxImg.style.opacity = '0';
     dom.lightboxImg.src = img.src;
+    dom.lightboxImg.alt = '图片';
     dom.lightboxImg.onload = () => { dom.lightboxImg.style.opacity = '1'; };
+    // R2 链接过期或加载失败时给出提示,避免图片一直透明
+    dom.lightboxImg.onerror = () => {
+      dom.lightboxImg.style.opacity = '1';
+      dom.lightboxImg.alt = '图片加载失败';
+    };
 
     dom.lightboxCounter.textContent = `${state.lightboxIndex + 1} / ${state.lightboxImages.length}`;
     dom.lightboxPrev.style.display = state.lightboxImages.length > 1 ? '' : 'none';
@@ -2129,61 +2165,145 @@
   function closeLightbox() {
     dom.lightbox.style.display = 'none';
     document.body.style.overflow = '';
+    resetLightboxTransform();
   }
 
   function lightboxPrev() {
     if (state.lightboxImages.length <= 1) return;
     state.lightboxIndex = (state.lightboxIndex - 1 + state.lightboxImages.length) % state.lightboxImages.length;
-    dom.lightboxImgWrap.style.transform = 'translateX(-20px)';
-    setTimeout(() => {
-      showLightboxImage();
-      dom.lightboxImgWrap.style.transform = 'translateX(20px)';
-      requestAnimationFrame(() => { dom.lightboxImgWrap.style.transform = 'translateX(0)'; });
-    }, 100);
+    showLightboxImage();
   }
 
   function lightboxNext() {
     if (state.lightboxImages.length <= 1) return;
     state.lightboxIndex = (state.lightboxIndex + 1) % state.lightboxImages.length;
-    dom.lightboxImgWrap.style.transform = 'translateX(20px)';
-    setTimeout(() => {
-      showLightboxImage();
-      dom.lightboxImgWrap.style.transform = 'translateX(-20px)';
-      requestAnimationFrame(() => { dom.lightboxImgWrap.style.transform = 'translateX(0)'; });
-    }, 100);
+    showLightboxImage();
   }
 
-  // 灯箱触摸手势
+  // 计算双指间距离(用于捏合缩放)
+  function getTouchDist(e) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // 灯箱触摸手势:单指滑动切换/拖拽平移,双指捏合缩放,双击放大
   function initLightboxTouch() {
     const lb = dom.lightbox;
+
     lb.addEventListener('touchstart', (e) => {
-      state.lightboxTouchStartX = e.touches[0].clientX;
-      state.lightboxTouchStartY = e.touches[0].clientY;
-      state.lightboxSwipeHandled = false;
+      if (e.touches.length === 1) {
+        state.lightboxTouchStartX = e.touches[0].clientX;
+        state.lightboxTouchStartY = e.touches[0].clientY;
+        state.lightboxSwipeHandled = false;
+        state.lightboxDragMoved = false;
+        // 放大状态下记录拖拽起点
+        if (state.lightboxScale > 1) {
+          state.lightboxDragStartX = e.touches[0].clientX - state.lightboxX;
+          state.lightboxDragStartY = e.touches[0].clientY - state.lightboxY;
+        }
+      } else if (e.touches.length === 2) {
+        // 双指捏合:记录初始距离与缩放
+        state.lightboxPinchStartDist = getTouchDist(e) || 1;
+        state.lightboxPinchStartScale = state.lightboxScale;
+        state.lightboxSwipeHandled = true; // 双指时禁用滑动切换
+      }
     }, { passive: true });
 
     lb.addEventListener('touchmove', (e) => {
-      if (state.lightboxSwipeHandled) return;
-      const dx = e.touches[0].clientX - state.lightboxTouchStartX;
-      const dy = e.touches[0].clientY - state.lightboxTouchStartY;
-      // 水平滑动为主
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-        state.lightboxSwipeHandled = true;
-        if (dx < 0) lightboxNext(); else lightboxPrev();
+      if (e.touches.length === 2) {
+        // 双指捏合缩放
+        e.preventDefault();
+        const dist = getTouchDist(e) || 1;
+        let scale = state.lightboxPinchStartScale * (dist / state.lightboxPinchStartDist);
+        scale = Math.max(1, Math.min(5, scale));
+        state.lightboxScale = scale;
+        if (scale === 1) { state.lightboxX = 0; state.lightboxY = 0; }
+        applyLightboxTransform();
+      } else if (e.touches.length === 1) {
+        if (state.lightboxScale > 1) {
+          // 放大状态:拖拽平移
+          e.preventDefault();
+          state.lightboxX = e.touches[0].clientX - state.lightboxDragStartX;
+          state.lightboxY = e.touches[0].clientY - state.lightboxDragStartY;
+          state.lightboxDragMoved = true;
+          applyLightboxTransform();
+        } else if (!state.lightboxSwipeHandled) {
+          // 1x 状态:水平滑动切换图片
+          const dx = e.touches[0].clientX - state.lightboxTouchStartX;
+          const dy = e.touches[0].clientY - state.lightboxTouchStartY;
+          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+            state.lightboxSwipeHandled = true;
+            if (dx < 0) lightboxNext(); else lightboxPrev();
+          }
+        }
       }
-    }, { passive: true });
+    }, { passive: false });
 
     // 双击放大/还原
     let lastTapTime = 0;
-    lb.addEventListener('touchend', (e) => {
+    lb.addEventListener('touchend', () => {
       const now = Date.now();
-      if (now - lastTapTime < 300 && !state.lightboxSwipeHandled) {
-        // 双击
-        const currentScale = dom.lightboxImg.style.transform.includes('scale(') ? 2 : 1;
-        dom.lightboxImg.style.transform = currentScale === 1 ? 'scale(2)' : 'scale(1)';
+      if (now - lastTapTime < 300 && !state.lightboxSwipeHandled && !state.lightboxDragMoved) {
+        if (state.lightboxScale > 1) {
+          resetLightboxTransform();
+        } else {
+          state.lightboxScale = 2;
+          applyLightboxTransform();
+        }
       }
       lastTapTime = now;
     }, { passive: true });
+  }
+
+  // 灯箱桌面端交互:滚轮缩放、双击放大、拖拽平移
+  function initLightboxDesktop() {
+    const lb = dom.lightbox;
+
+    // 滚轮缩放
+    lb.addEventListener('wheel', (e) => {
+      if (dom.lightbox.style.display === 'none') return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      let scale = state.lightboxScale + delta;
+      scale = Math.max(1, Math.min(5, scale));
+      state.lightboxScale = scale;
+      if (scale === 1) { state.lightboxX = 0; state.lightboxY = 0; }
+      applyLightboxTransform();
+    }, { passive: false });
+
+    // 双击图片放大/还原
+    lb.addEventListener('dblclick', (e) => {
+      if (e.target !== dom.lightboxImg) return;
+      if (state.lightboxScale > 1) {
+        resetLightboxTransform();
+      } else {
+        state.lightboxScale = 2;
+        applyLightboxTransform();
+      }
+    });
+
+    // 鼠标拖拽平移(仅在放大状态下生效)
+    lb.addEventListener('mousedown', (e) => {
+      if (e.target !== dom.lightboxImg || state.lightboxScale <= 1) return;
+      state.lightboxMouseDown = true;
+      state.lightboxDragStartX = e.clientX - state.lightboxX;
+      state.lightboxDragStartY = e.clientY - state.lightboxY;
+      dom.lightboxImg.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!state.lightboxMouseDown) return;
+      state.lightboxX = e.clientX - state.lightboxDragStartX;
+      state.lightboxY = e.clientY - state.lightboxDragStartY;
+      applyLightboxTransform();
+    });
+    window.addEventListener('mouseup', () => {
+      if (state.lightboxMouseDown) {
+        state.lightboxMouseDown = false;
+        dom.lightboxImg.style.cursor = state.lightboxScale > 1 ? 'grab' : 'zoom-in';
+      }
+    });
   }
 
   // ==================== Reactions Picker（增强：自适应定位） ====================
@@ -2770,14 +2890,16 @@
 
     // 灯箱
     dom.lightboxClose.addEventListener('click', closeLightbox);
-    dom.lightboxPrev.addEventListener('click', lightboxPrev);
-    dom.lightboxNext.addEventListener('click', lightboxNext);
+    dom.lightboxPrev.addEventListener('click', (e) => { e.stopPropagation(); lightboxPrev(); });
+    dom.lightboxNext.addEventListener('click', (e) => { e.stopPropagation(); lightboxNext(); });
+    // 仅点击空白区域(灯箱背景)关闭,点击图片本身不关闭(避免误触)
     dom.lightbox.addEventListener('click', (e) => {
-      if (e.target === dom.lightbox || e.target === dom.lightboxImgWrap) closeLightbox();
+      if (e.target === dom.lightbox) closeLightbox();
     });
 
-    // 灯箱触摸手势
+    // 灯箱触摸手势(手机端) + 桌面端交互(滚轮/双击/拖拽)
     initLightboxTouch();
+    initLightboxDesktop();
 
     // Reactions（事件委托）
     dom.memoList.addEventListener('click', (e) => {
