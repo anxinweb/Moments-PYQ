@@ -21,7 +21,7 @@ const CONFIG = {
   // 游客 GET 请求直连 memos,绕过 Vercel Serverless 冷启动(可达 12 秒)
   // 需 memos 后端配置 CORS 允许前端域名(已在 Nginx 配置 /api/ CORS)
   // 登录用户的请求(含 token)仍走 proxy,保护凭证不暴露
-  DIRECT_GET_FOR_GUEST: true,
+  DIRECT_GET_FOR_GUEST: false,
 
   // ╔══════════════════════════════════════╗
   // ║  ★ 2. 站点信息                      ║
