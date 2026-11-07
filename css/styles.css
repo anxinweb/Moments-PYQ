@@ -284,7 +284,7 @@ a {
 /* ------------------------------------------------------------------ 信息流 */
 
 .feed {
-  padding-top: 18px;
+  padding-top: 26px; /* 手机端：封面到第一条动态的间距再加一点 */
 }
 
 .moment {
@@ -1284,14 +1284,25 @@ a {
     height: 48px;
   }
 
+  /* 对标微信电脑版：内容两侧留白约 11%、封面到首条动态约 40px */
+  .feed {
+    padding-top: 40px;
+  }
+
   .moment {
     grid-template-columns: 48px minmax(0, 1fr);
     column-gap: 14px;
-    padding: 0 24px 22px;
+    padding: 0 70px 24px;
   }
 
   .moment + .moment {
-    padding-top: 22px;
+    padding-top: 24px;
+  }
+
+  .skeleton {
+    grid-template-columns: 48px minmax(0, 1fr);
+    column-gap: 14px;
+    padding: 0 70px 22px;
   }
 
   .moment-avatar {
