@@ -46,6 +46,7 @@ const el = {
   commentNick: $('commentNick'),
   commentInput: $('commentInput'),
   commentSend: $('commentSend'),
+  commentEmos: $('commentEmos'),
 };
 
 const DESKTOP_MQ = window.matchMedia('(min-width: 768px)');
@@ -414,10 +415,10 @@ let commentTargetUid = '';
 
 function openCommentBar(uid) {
   commentTargetUid = uid;
-  const nick = getNickname();
-  el.commentNick.hidden = !!nick;
-  el.commentNick.value = nick;
+  // 昵称行常显：填过就直接带出，随时可以改名
+  el.commentNick.value = getNickname();
   el.commentInput.value = '';
+  el.commentSend.disabled = true;
   el.commentBar.hidden = false;
   // 移动端需要用户手势内 focus 才能唤起键盘，这里在同一次点击里聚焦
   el.commentInput.focus();
@@ -432,9 +433,9 @@ function closeCommentBar() {
 
 async function sendComment() {
   if (!commentTargetUid) return;
-  const name = el.commentNick.hidden ? getNickname() : el.commentNick.value.trim();
+  const name = el.commentNick.value.trim();
   const text = el.commentInput.value.trim();
-  if (!el.commentNick.hidden && !name) {
+  if (!name) {
     toast('先给自己起个昵称吧');
     el.commentNick.focus();
     return;
@@ -462,8 +463,12 @@ async function sendComment() {
 
 function initCommentBar() {
   el.commentSend.addEventListener('click', sendComment);
+  // 有字才亮「发送」（同微信）
+  el.commentInput.addEventListener('input', () => {
+    el.commentSend.disabled = el.commentInput.value.trim().length === 0;
+  });
   el.commentInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendComment();
     }
@@ -473,6 +478,10 @@ function initCommentBar() {
       e.preventDefault();
       el.commentInput.focus();
     }
+  });
+  // 语音/表情/图片占位图标（微信同款外观，功能暂未开放）
+  el.commentEmos.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', () => toast('暂不支持语音 / 表情 / 图片评论'));
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeCommentBar();
