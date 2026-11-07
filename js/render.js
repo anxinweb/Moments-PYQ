@@ -230,19 +230,20 @@ function popoverHtml() {
   );
 }
 
-export function renderMoment(memo, profile) {
+export function renderMoment(memo, profile, opts = {}) {
   const media = mediaOf(memo);
   const body = renderContent(memo.content, { hideTags: CONFIG.HIDE_TAGS });
   const hasText = body.trim().length > 0;
   const name = profile?.name || CONFIG.NICKNAME;
   const avatar = profile?.avatar || PLACEHOLDER_AVATAR;
+  const folded = opts.folded !== false;
 
   return (
     `<article class="moment" data-name="${escapeHtml(memo.name)}">` +
     `<img class="moment-avatar" src="${avatar}" data-avatar="${avatar}" alt="" decoding="async">` +
     `<div class="moment-body">` +
     `<h2 class="moment-name">${escapeHtml(name)}</h2>` +
-    (hasText ? `<div class="moment-text is-folded">${body}</div>` : '') +
+    (hasText ? `<div class="moment-text${folded ? ' is-folded' : ''}">${body}</div>` : '') +
     (media.images.length ? gridHtml(media.images) : '') +
     media.videos.map(videoHtml).join('') +
     media.audios.map(audioHtml).join('') +

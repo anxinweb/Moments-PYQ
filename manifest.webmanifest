@@ -1,0 +1,25 @@
+{
+  "name": "Ah新的朋友圈",
+  "short_name": "朋友圈",
+  "description": "记录生活中的每一刻",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ededed",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "./assets/pyqlogo.png",
+      "sizes": "500x500",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/pyqlogo.png",
+      "sizes": "500x500",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

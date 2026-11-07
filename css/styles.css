@@ -43,6 +43,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   background: var(--bg-page);
   -webkit-text-size-adjust: 100%;
@@ -263,6 +267,11 @@ a {
   object-fit: cover;
   background: var(--avatar-bg);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* 可点击的头像（进资料页） */
+.is-link {
+  cursor: pointer;
 }
 
 @media (max-width: 360px) {
@@ -1169,6 +1178,74 @@ a {
   text-align: center;
   color: var(--text-3);
   font-size: 15px;
+}
+
+/* ------------------------------------------------------------------ 资料页 */
+
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 64px 24px 48px;
+}
+
+.profile-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: var(--avatar-bg);
+  box-shadow: var(--shadow);
+}
+
+.profile-name {
+  margin: 14px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.profile-bio {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.profile-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.profile-btn {
+  display: inline-block;
+  padding: 9px 22px;
+  border-radius: 20px;
+  background: var(--drawer);
+  color: var(--link);
+  font-size: 14px;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.profile-btn:hover {
+  background: var(--line);
+}
+
+.profile-btn.ghost {
+  color: var(--text-2);
+}
+
+/* 详情页正文铺满不折叠，顶部给固定导航让位 */
+.is-sub .feed {
+  padding-top: 64px;
+}
+
+.is-sub .moment {
+  padding-top: 0;
 }
 
 /* ------------------------------------------------------------------ 桌面 / 平板自适应

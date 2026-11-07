@@ -33,6 +33,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (url.pathname === '/api/feed') return await handleFeed(url, res);
+    if (url.pathname === '/api/memo') return await handleMemo(url, res);
     if (url.pathname === '/api/profile') return await handleProfile(url, res);
     if (url.pathname === '/api/img') return await handleImg(url, res);
     return serveStatic(url, res);
@@ -57,6 +58,18 @@ async function handleFeed(url, res) {
     'cache-control': 'no-store',
   });
   res.end(body);
+}
+
+async function handleMemo(url, res) {
+  const uid = (url.searchParams.get('uid') || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const r = await fetch(`${UPSTREAM}/api/memos/${uid}`, { headers: { accept: 'application/json' } });
+  const body = await r.text();
+  res.writeHead(r.status, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+  });
+  // 与线上 api/memo.js 同构：包一层 { memo }
+  res.end(r.ok ? JSON.stringify({ memo: JSON.parse(body) }) : body);
 }
 
 async function handleProfile(url, res) {
@@ -108,6 +121,7 @@ async function handleImg(url, res) {
 function serveStatic(url, res) {
   let pathname = decodeURIComponent(url.pathname);
   if (pathname === '/') pathname = '/index.html';
+  if (pathname === '/about') pathname = '/index.html';
   if (pathname.startsWith('/memo/')) pathname = '/index.html';
 
   const filePath = path.join(ROOT, pathname);

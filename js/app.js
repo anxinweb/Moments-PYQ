@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { getProfile, getMemos, PLACEHOLDER_AVATAR } from './api.js';
+import { getProfile, getMemos, getMemo, PLACEHOLDER_AVATAR } from './api.js';
 import { renderMoment, imagesOf } from './render.js';
 
 const $ = (id) => document.getElementById(id);
@@ -22,6 +22,8 @@ const el = {
   navTitle: $('navTitle'),
   themeBtn: $('themeBtn'),
   postBtn: $('postBtn'),
+  backBtn: $('backBtn'),
+  shareBtn: $('shareBtn'),
   viewer: $('viewer'),
   viewerStage: $('viewerStage'),
   viewerImg: $('viewerImg'),
@@ -87,7 +89,6 @@ function applyProfile(profile) {
     { once: true }
   );
   el.postBtn.href = CONFIG.POST_URL;
-  document.title = CONFIG.SITE_TITLE;
 
   // 刷新 ?page=n 时信息流走 CDN 缓存会比资料先到，那时头像渲染成占位图，
   // 资料回来后统一回填一次，避免前面几条的头像一直是灰块
@@ -243,7 +244,7 @@ function bindAudio(card) {
   });
 }
 
-function bindMoment(node) {
+function bindMoment(node, opts = {}) {
   node.querySelectorAll('.cell').forEach((cell) => {
     cell.addEventListener('click', () => {
       const grid = cell.closest('.grid');
@@ -254,6 +255,26 @@ function bindMoment(node) {
       openViewer(list, Number(cell.dataset.index) || 0, cell);
     });
   });
+
+  // 头像 → 资料页（同微信点头像进个人名片）
+  node.querySelectorAll('.moment-avatar').forEach((img) => {
+    img.classList.add('is-link');
+    img.addEventListener('click', () => {
+      location.href = '/about';
+    });
+  });
+
+  // 列表页：点正文任意处进单条详情（微信行为）；详情页内不重复跳转
+  if (opts.linkDetail !== false) {
+    const body = node.querySelector('.moment-body');
+    const uid = (node.dataset.name || '').split('/')[1];
+    if (body && uid) {
+      body.addEventListener('click', (e) => {
+        if (e.target.closest('a, button, .cell, .media, .grid, .fold-btn, .popover')) return;
+        location.href = '/memo/' + uid;
+      });
+    }
+  }
 
   // 「…」→ 赞 / 评论浮层（同微信：点空白处或滚动即收起）
   const moreBtn = node.querySelector('.more-btn');
@@ -931,6 +952,146 @@ function initViewer() {
   });
 }
 
+/* --------------------------------------------------------------- 路由与子页面 */
+
+/** /memo/<uid> → 单条详情；/about → 资料页；其余为信息流 */
+function parseRoute() {
+  const p = location.pathname;
+  const m = p.match(/^\/memo\/([A-Za-z0-9_-]+)\/?$/);
+  if (m) return { view: 'memo', uid: m[1] };
+  if (/^\/about\/?$/.test(p)) return { view: 'about' };
+  return { view: 'feed' };
+}
+
+/** 子页面的外壳：无封面、隐藏分页/回顶，导航换成 返回 + 标题 + 分享 */
+function setupChrome(route) {
+  document.body.classList.add('is-sub');
+  el.cover.hidden = true;
+  el.pager.hidden = true;
+  el.topBtn.hidden = true;
+  el.backBtn.hidden = false;
+  el.themeBtn.hidden = true;
+  el.postBtn.hidden = route.view !== 'feed';
+  el.shareBtn.hidden = route.view !== 'memo';
+  el.navTitle.textContent = route.view === 'memo' ? '详情' : '资料';
+  document.title = route.view === 'memo' ? '详情' : '资料';
+  el.backBtn.addEventListener('click', () => {
+    if (document.referrer && new URL(document.referrer).origin === location.origin) {
+      history.back();
+    } else {
+      location.href = './';
+    }
+  });
+}
+
+async function loadDetailView(uid) {
+  try {
+    const [memo] = await Promise.all([getMemo(uid), ensureProfile()]);
+    el.feed.innerHTML = '';
+    const frag = document.createElement('div');
+    frag.innerHTML = renderMoment(memo, state.profile, { folded: false });
+    const node = frag.firstElementChild;
+    el.feed.appendChild(node);
+    hydrateImages(node);
+    bindMoment(node, { linkDetail: false });
+    bindShare(memo);
+    onScroll();
+  } catch (err) {
+    console.error('[memo]', err);
+    el.feed.innerHTML = '<p class="empty">这条动态不存在，或已设为不可见</p>';
+  }
+}
+
+/** 详情页右上角：系统分享面板优先，没有就复制链接 */
+function bindShare(memo) {
+  const uid = (memo.name || '').split('/')[1];
+  const url = location.origin + '/memo/' + uid;
+  const text = (memo.content || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  el.shareBtn.addEventListener('click', async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: CONFIG.SITE_TITLE, text, url });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // 用户取消
+      }
+    }
+    copyText(url);
+  });
+}
+
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(
+      () => toast('链接已复制'),
+      () => fallbackCopy(text)
+    );
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-99px;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch (e) {
+    ok = false;
+  }
+  ta.remove();
+  toast(ok ? '链接已复制' : '复制失败，请手动复制地址栏链接');
+}
+
+async function loadAboutView() {
+  await ensureProfile();
+  const p = state.profile;
+  el.feed.innerHTML =
+    `<section class="profile-page">` +
+    `<img class="profile-avatar" src="${p.avatar || PLACEHOLDER_AVATAR}" alt="" decoding="async">` +
+    `<h2 class="profile-name">${escape(p.name)}</h2>` +
+    (p.bio ? `<p class="profile-bio">${escape(p.bio)}</p>` : '') +
+    `<div class="profile-actions">` +
+    `<a class="profile-btn" href="${CONFIG.MEMOS_URL}/u/${CONFIG.ADMIN_USER}" target="_blank" rel="noopener">Memos 主页</a>` +
+    `<a class="profile-btn ghost" href="./">返回朋友圈</a>` +
+    `</div>` +
+    `</section>`;
+  el.feed.querySelector('.profile-avatar').addEventListener('error', (e) => {
+    e.target.src = PLACEHOLDER_AVATAR;
+  });
+  hydrateImages(el.feed);
+  onScroll();
+}
+
+function escape(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+let profileReady = null;
+function ensureProfile() {
+  if (!profileReady) {
+    profileReady = getProfile()
+      .then((p) => {
+        applyProfile(p);
+        return p;
+      })
+      .catch(() => {
+        applyProfile({ name: CONFIG.NICKNAME, avatar: '', bio: '' });
+        return state.profile;
+      });
+  }
+  return profileReady;
+}
+
 /* --------------------------------------------------------------- 滚动 */
 
 let ticking = false;
@@ -950,12 +1111,7 @@ function onScroll() {
 function initScroll() {
   window.addEventListener('scroll', onScroll, { passive: true });
   el.topBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-  // 点标题回主页顶部（同微信状态栏点一下回顶），保留 ctrl/⌘ 点击开新标签
-  el.navTitle.addEventListener('click', (e) => {
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    e.preventDefault();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
+  // 顶部「朋友圈」是普通链接：点击整页跳回首页刷新（导航逻辑交给浏览器）
   onScroll();
 }
 
@@ -965,10 +1121,31 @@ async function boot() {
   initTheme();
   initScroll();
   initViewer();
+
+  const route = parseRoute();
+  const profileTask = ensureProfile();
+
+  if (route.view === 'memo') {
+    setupChrome(route);
+    await loadDetailView(route.uid);
+    return;
+  }
+  if (route.view === 'about') {
+    setupChrome(route);
+    await loadAboutView();
+    return;
+  }
+
   initCover();
   el.retry.addEventListener('click', () => gotoPage(Math.max(1, state.loadedPages + 1)));
   el.moreBtn.addEventListener('click', () => loadOnePage());
   window.addEventListener('popstate', () => gotoPage(pageFromUrl()));
+
+  // 封面头像 → 资料页（同微信点头像看个人主页）
+  el.coverAvatar.classList.add('is-link');
+  el.coverAvatar.addEventListener('click', () => {
+    location.href = '/about';
+  });
 
   // 赞/评论浮层：点空白处、滚动页面、按 Esc 都收起（同微信）
   document.addEventListener('click', closePopover);
@@ -977,13 +1154,8 @@ async function boot() {
     if (e.key === 'Escape') closePopover();
   });
 
-  // 资料与首屏动态并行请求（原先串行，白白多等一个来回）
-  const profileTask = getProfile()
-    .then(applyProfile)
-    .catch(() => applyProfile({ name: CONFIG.NICKNAME, avatar: '', bio: '' }));
-
+  // 资料与首屏动态并行请求
   firstPageTask = getMemos({ pageToken: '' });
-
   await Promise.all([profileTask, gotoPage(pageFromUrl())]);
 
   state.booting = false;

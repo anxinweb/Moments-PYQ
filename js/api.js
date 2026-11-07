@@ -40,6 +40,16 @@ export async function getMemos({ pageToken } = {}) {
   return { memos, nextPageToken: data.nextPageToken || '' };
 }
 
+/** 单条动态（详情页）：仅返回本站作者的公开动态 */
+export async function getMemo(uid) {
+  const data = await getJSON('/memo?uid=' + encodeURIComponent(uid));
+  const memo = data && data.memo;
+  if (!memo || memo.creator !== `users/${CONFIG.ADMIN_USER}`) {
+    throw new Error('not_found');
+  }
+  return memo;
+}
+
 /** 附件原图地址：memos.ahxin.cn/file/attachments/<id>/<filename> */
 export function attachmentUrl(att) {
   const id = (att.name || '').split('/')[1] || '';
