@@ -251,17 +251,42 @@ function bindMoment(node) {
         thumb: i.currentSrc || i.src,
         origin: i.dataset.origin || i.src,
       }));
-      openViewer(list, Number(cell.dataset.index) || 0);
+      openViewer(list, Number(cell.dataset.index) || 0, cell);
     });
   });
+
+  // 「…」→ 赞 / 评论浮层（同微信：点空白处或滚动即收起）
   const moreBtn = node.querySelector('.more-btn');
-  if (moreBtn) {
-    moreBtn.addEventListener('click', () => {
-      toast('点赞与评论将在下一步接入');
+  const pop = node.querySelector('.popover');
+  if (moreBtn && pop) {
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const willOpen = pop.hidden;
+      closePopover();
+      if (!willOpen) return;
+      pop.hidden = false;
+      openPopover = pop;
+    });
+    pop.addEventListener('click', (e) => {
+      const btn = e.target.closest('.pop-btn');
+      if (!btn) return;
+      const act = btn.dataset.act;
+      closePopover();
+      toast(act === 'like' ? '点赞功能正在接入，马上就能用了' : '评论功能正在接入，马上就能用了');
     });
   }
 
   node.querySelectorAll('.media-audio').forEach(bindAudio);
+}
+
+/* --------------------------------------------------------------- 赞/评论浮层 */
+
+let openPopover = null;
+
+function closePopover() {
+  if (!openPopover) return;
+  openPopover.hidden = true;
+  openPopover = null;
 }
 
 /* --------------------------------------------------------------- 分页加载 */
@@ -284,9 +309,7 @@ function syncUrl() {
     state.loadedPages > 1
       ? `${location.pathname}?page=${state.loadedPages}`
       : location.pathname;
-  if (location.search !== next.replace(location.pathname, '') || state.loadedPages > 1) {
-    history.replaceState(null, '', next);
-  }
+  if (location.pathname + location.search !== next) history.replaceState(null, '', next);
 }
 
 function updatePager() {
@@ -400,15 +423,19 @@ const viewer = {
   panX: 0,
   panY: 0,
   token: 0,
+  fromEl: null,
+  switching: false,
 };
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const ZOOM_STEP = 2.6;
+const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 let tapAt = 0;
 let tapTimer = 0;
 let lastReset = 0; // 轻点/双击还原缩放的时刻，其后一瞬间内的轻点不再参与判定
+let lastGestureAt = 0; // 手势刚结束，避免拖动后被当成点击背景而关闭
 
 // 原图预加载缓存：url -> HTMLImageElement（浏览器 HTTP 缓存之外再保一层，切图零等待）
 const originCache = new Map();
@@ -430,12 +457,14 @@ function preloadAround() {
   const total = viewer.list.length;
   if (total < 2) return;
   [1, -1, 2, -2].forEach((d) => {
-    const item = viewer.list[(viewer.index + d + total) % total];
+    const i = viewer.index + d;
+    if (i < 0 || i >= total) return;
+    const item = viewer.list[i];
     if (item) preloadOrigin(item.origin);
   });
 }
 
-function openViewer(list, index) {
+function openViewer(list, index, fromEl) {
   if (!list.length) return;
   viewer.list = list;
   viewer.index = index;
@@ -443,13 +472,36 @@ function openViewer(list, index) {
   viewer.scale = 1;
   viewer.panX = 0;
   viewer.panY = 0;
+  viewer.switching = false;
+  viewer.fromEl = fromEl || null;
   el.viewer.classList.add('is-open');
+  el.viewer.classList.remove('is-closing');
   el.viewer.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
   paintViewer();
+  // 从缩略图位置放大展开（微信的打开动效）
+  const cell = viewer.fromEl;
+  if (!cell || !cell.isConnected || REDUCE_MOTION.matches) return;
+  const from = cell.getBoundingClientRect();
+  if (!from.width) return;
+  requestAnimationFrame(() => {
+    if (!viewer.open) return;
+    const to = el.viewerImg.getBoundingClientRect();
+    if (!to.width || !to.height) return;
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    const s = Math.min(1.3, from.width / to.width);
+    el.viewerImg.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${s})`, opacity: 0.45 },
+        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+      ],
+      { duration: 280, easing: 'cubic-bezier(.22,.72,.24,1)' }
+    );
+  });
 }
 
-function paintViewer() {
+function paintViewer(dir = 0) {
   const total = viewer.list.length;
   const item = viewer.list[viewer.index];
   if (!item) return;
@@ -458,11 +510,22 @@ function paintViewer() {
   const token = viewer.token;
 
   // 先用已缓存的缩略图立即上屏，切换不会有空白等待
+  el.viewerImg.classList.remove('is-panning');
   el.viewerImg.src = item.thumb || item.origin;
   el.viewerCount.textContent = total > 1 ? `${viewer.index + 1} / ${total}` : '';
-  el.viewerPrev.hidden = total < 2;
-  el.viewerNext.hidden = total < 2;
+  applyArrowState();
   applyViewerTransform();
+
+  // 新图从手指滑动的方向滑入
+  if (dir && !REDUCE_MOTION.matches) {
+    el.viewerImg.animate(
+      [
+        { transform: `translateX(${dir > 0 ? 52 : -52}px)`, opacity: 0.35 },
+        { transform: 'translateX(0)', opacity: 1 },
+      ],
+      { duration: 210, easing: 'cubic-bezier(.26,.8,.3,1)' }
+    );
+  }
 
   // 原图解码完成后无缝替换为高清版本
   const pre = preloadOrigin(item.origin);
@@ -474,6 +537,15 @@ function paintViewer() {
   else pre.addEventListener('load', swap, { once: true });
 
   preloadAround();
+}
+
+/** 箭头：第一张没有上一张、最后一张没有下一张（同微信，不循环） */
+function applyArrowState() {
+  const total = viewer.list.length;
+  el.viewerPrev.hidden = total < 2;
+  el.viewerNext.hidden = total < 2;
+  el.viewerPrev.classList.toggle('is-off', viewer.index <= 0);
+  el.viewerNext.classList.toggle('is-off', viewer.index >= total - 1);
 }
 
 function applyViewerTransform() {
@@ -529,26 +601,92 @@ function zoomTo(target, clientX, clientY) {
 }
 
 function stepViewer(delta) {
+  if (!viewer.open) return;
   const total = viewer.list.length;
-  if (total < 2) return;
-  viewer.index = (viewer.index + delta + total) % total;
+  const next = viewer.index + delta;
+  if (total < 2 || next < 0 || next >= total) return;
+  viewer.index = next;
   viewer.scale = 1;
   viewer.panX = 0;
   viewer.panY = 0;
   el.viewer.style.background = '';
-  paintViewer();
+  paintViewer(delta);
 }
 
-function closeViewer() {
+/** 划到边界：图片滑出去，再从另一侧滑入新图（两段拼接，接近微信手感） */
+function slideTo(dir) {
+  if (viewer.switching) return;
+  const total = viewer.list.length;
+  const next = viewer.index + dir;
+  if (next < 0 || next >= total) {
+    // 端点：回弹
+    viewer.panX = 0;
+    el.viewerImg.classList.remove('is-panning');
+    applyViewerTransform();
+    return;
+  }
+  viewer.switching = true;
+  const w = el.viewerStage.clientWidth;
+  const from = viewer.panX;
+  el.viewerImg.classList.remove('is-panning');
+  const anim = el.viewerImg.animate(
+    [
+      { transform: `translate3d(${from}px, 0, 0)` },
+      { transform: `translate3d(${dir > 0 ? -w : w}px, 0, 0)`, opacity: 0.4 },
+    ],
+    { duration: 165, easing: 'cubic-bezier(.4,0,.6,1)' }
+  );
+  const done = () => {
+    viewer.switching = false;
+    stepViewer(dir);
+  };
+  anim.finished.then(done, done);
+}
+
+function teardownViewer() {
   viewer.open = false;
   viewer.token += 1; // 取消尚未完成的原图替换
+  viewer.switching = false;
+  viewer.fromEl = null;
   clearTimeout(tapTimer);
-  el.viewer.classList.remove('is-open');
-  el.viewer.classList.remove('is-zoom');
+  el.viewer.classList.remove('is-open', 'is-zoom', 'is-closing');
   el.viewer.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
   el.viewer.style.background = '';
+  el.viewerImg.style.transform = '';
   el.viewerImg.removeAttribute('src');
+}
+
+function closeViewer() {
+  if (!viewer.open) return;
+  // 先冻结状态，后续手势/延时都不再生效
+  viewer.open = false;
+  viewer.token += 1;
+  clearTimeout(tapTimer);
+
+  const cell = viewer.fromEl;
+  const rect = cell && cell.isConnected ? cell.getBoundingClientRect() : null;
+  const box = el.viewerImg.getBoundingClientRect();
+  const canFlip = rect && rect.width > 2 && box.width > 0 && viewer.scale <= 1.01 && !REDUCE_MOTION.matches;
+  if (!canFlip) {
+    teardownViewer();
+    return;
+  }
+
+  // 收回缩略图原位
+  const dx = rect.left + rect.width / 2 - (box.left + box.width / 2);
+  const dy = rect.top + rect.height / 2 - (box.top + box.height / 2);
+  const s = Math.min(1.3, rect.width / box.width);
+  el.viewer.classList.add('is-closing');
+  const anim = el.viewerImg.animate(
+    [
+      { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+      { transform: `translate(${dx}px, ${dy}px) scale(${s})`, opacity: 0.25 },
+    ],
+    { duration: 220, easing: 'cubic-bezier(.4,0,.7,1)' }
+  );
+  const done = () => teardownViewer();
+  anim.finished.then(done, done);
 }
 
 
@@ -557,7 +695,10 @@ function initViewer() {
   el.viewerPrev.addEventListener('click', () => stepViewer(-1));
   el.viewerNext.addEventListener('click', () => stepViewer(1));
   el.viewerStage.addEventListener('click', (e) => {
-    if (e.target === el.viewerStage) closeViewer();
+    if (e.target !== el.viewerStage) return;
+    // 刚拖完图松手，别把这次点击当成「点背景关闭」
+    if (performance.now() - lastGestureAt < 320) return;
+    closeViewer();
   });
 
   const pointers = new Map();
@@ -578,6 +719,7 @@ function initViewer() {
   const all = () => Array.from(pointers.values());
 
   el.viewerStage.addEventListener('pointerdown', (e) => {
+    if (!viewer.open || viewer.switching) return;
     // 箭头/关闭按钮不参与手势，否则会影响点击
     if (e.target.closest('.viewer-arrow') || e.target.closest('.viewer-close')) return;
 
@@ -640,7 +782,14 @@ function initViewer() {
       return;
     }
 
-    // 未放大：纵向下拉跟手，用来关闭（同微信）
+    // 未放大：横向拖动跟手（切图），纵向下拉跟手（关闭），同微信
+    if (Math.abs(dx) > 4 && Math.abs(dx) > Math.abs(dy)) {
+      const edge = viewer.list.length < 2 || (dx > 0 && viewer.index === 0) || (dx < 0 && viewer.index === viewer.list.length - 1);
+      viewer.panX = edge ? dx * 0.22 : dx * 0.92;
+      el.viewerImg.classList.add('is-panning');
+      applyViewerTransform();
+      return;
+    }
     if (dy > 4 && Math.abs(dy) > Math.abs(dx)) {
       viewer.panY = Math.min(dy * 0.92, 280);
       el.viewerImg.classList.add('is-panning');
@@ -701,21 +850,26 @@ function initViewer() {
       return;
     }
 
+    lastGestureAt = performance.now();
+
     // 未放大时下拉超过阈值 → 关闭（同微信）
     if (viewer.panY > 110) {
       closeViewer();
       return;
     }
-    if (viewer.panY) {
-      viewer.panY = 0;
-      el.viewer.style.background = '';
-      applyViewerTransform();
+
+    // 横向拖动过阈值 → 切图（第一张/最后一张回弹，与微信一致不循环）
+    if (!isTap && Math.abs(viewer.panX) > 62 && Math.abs(viewer.panX) > Math.abs(dy)) {
+      slideTo(viewer.panX < 0 ? 1 : -1);
+      return;
     }
 
-    // 左右滑动切图
-    if (!isTap && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
-      stepViewer(dx < 0 ? 1 : -1);
-      return;
+    // 其余拖动：回弹到原位
+    if (viewer.panY || viewer.panX) {
+      viewer.panY = 0;
+      viewer.panX = 0;
+      el.viewer.style.background = '';
+      applyViewerTransform();
     }
     if (!isTap) return;
 
@@ -815,6 +969,13 @@ async function boot() {
   el.retry.addEventListener('click', () => gotoPage(Math.max(1, state.loadedPages + 1)));
   el.moreBtn.addEventListener('click', () => loadOnePage());
   window.addEventListener('popstate', () => gotoPage(pageFromUrl()));
+
+  // 赞/评论浮层：点空白处、滚动页面、按 Esc 都收起（同微信）
+  document.addEventListener('click', closePopover);
+  window.addEventListener('scroll', closePopover, { passive: true });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closePopover();
+  });
 
   // 资料与首屏动态并行请求（原先串行，白白多等一个来回）
   const profileTask = getProfile()

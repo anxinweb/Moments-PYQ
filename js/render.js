@@ -27,17 +27,41 @@ function linkify(html) {
 }
 
 /**
+ * 整行只有分隔符（- — – _ * =）时视为分割线，渲染成一条细线
+ * 注意：中文破折号单用（——后面接正文）不在此列，必须是整行
+ */
+const DIVIDER_RE = /^[ \t]*(?:[-—–_*=][ \t]*){2,}$/;
+const DIVIDER_TOKEN = '\u0001hr\u0001';
+
+/**
  * Memos 的 Markdown 精简成朋友圈能接受的纯文本 + 链接 + 加粗
  * 朋友圈没有标题/标签/代码块概念，这里全部降级处理
  */
 export function renderContent(raw, opts = {}) {
   const hideTags = opts.hideTags !== false;
-  let t = String(raw || '');
+  let t = String(raw || '').replace(/\r\n?/g, '\n');
 
   // 图片语法交给九宫格附件展示，正文里不再出现
   t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
   // 标题降级为普通文本
   t = t.replace(/^[ \t]*#{1,6}[ \t]+/gm, '');
+  t = t.replace(/^[ \t]*#{1,6}[ \t]*$/gm, '');
+
+  // 表格：先去掉 |---|---| 这类分隔行，再把单元格降级成空格分隔的纯文本
+  t = t.replace(
+    /^[ \t]*\|?[ \t]*:?-{2,}:?[ \t]*(?:\|[ \t]*:?-{2,}:?[ \t]*)+\|?[ \t]*$/gm,
+    ''
+  );
+  t = t.replace(/^[ \t]*\|(.+)\|[ \t]*$/gm, (_, inner) =>
+    inner.replace(/\|/g, ' ').replace(/[ \t]{2,}/g, ' ').trim()
+  );
+
+  // 分割线：换成占位标记，等转义完成后再落成 <hr>，避免被整行删掉
+  t = t
+    .split('\n')
+    .map((line) => (DIVIDER_RE.test(line) ? DIVIDER_TOKEN : line))
+    .join('\n');
+
   // 任务列表 → 勾选符号
   t = t.replace(/^[ \t]*[-*+][ \t]+\[[xX]\][ \t]*/gm, '☑ ');
   t = t.replace(/^[ \t]*[-*+][ \t]+\[ \][ \t]*/gm, '☐ ');
@@ -46,8 +70,6 @@ export function renderContent(raw, opts = {}) {
   // 引用前缀
   t = t.replace(/^[ \t]*>[ \t]?/gm, '');
   if (hideTags) t = t.replace(/(^|\s)#[^\s#]+/g, '$1');
-  // 水平分割线（朋友圈没有这个概念）
-  t = t.replace(/^[ \t]*([-—–_*][ \t]*){2,}$/gm, '');
   // 语法删除后残留的空格 / 空行 / 空列表行
   t = t.replace(/^[ \t]*·[ \t]*$/gm, '');
   t = t.replace(/[ \t]{2,}/g, ' ');
@@ -55,14 +77,21 @@ export function renderContent(raw, opts = {}) {
   t = t.replace(/\n{3,}/g, '\n\n');
 
   t = escapeHtml(t);
-  t = t.replace(/```([\s\S]*?)```/g, (_, code) => '<code>' + code.trim() + '</code>');
+  t = t.replace(/```([\s\S]*?)```/g, (_, code) => '<code class="md-code">' + code.trim() + '</code>');
   t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
   t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/~~([^~]+)~~/g, '<del>$1</del>');
   t = t.replace(
     /\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
   );
   t = linkify(t);
+  // 分割线前后的换行在 pre-wrap 里会变成空行盒，吃掉一层
+  t = t
+    .split('\n' + DIVIDER_TOKEN + '\n').join(DIVIDER_TOKEN)
+    .split('\n' + DIVIDER_TOKEN).join(DIVIDER_TOKEN)
+    .split(DIVIDER_TOKEN + '\n').join(DIVIDER_TOKEN);
+  t = t.split(DIVIDER_TOKEN).join('<hr class="md-hr">');
   return t.replace(/^[\s\u00a0]+/, '').replace(/[\s\u00a0]+$/, '');
 }
 
@@ -186,6 +215,21 @@ function gridHtml(images) {
   return `<div class="grid" data-count="${Math.min(count, 9)}" data-total="${count}">${cells}</div>`;
 }
 
+/** 微信「…」点开后的赞 / 评论浮层 */
+function popoverHtml() {
+  return (
+    `<div class="popover" data-pop hidden>` +
+    `<button class="pop-btn" type="button" data-act="like">` +
+    `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.6 4.7 13.3a4.9 4.9 0 0 1 0-6.9 4.7 4.7 0 0 1 6.6 0l.7.8.7-.8a4.7 4.7 0 0 1 6.6 0 4.9 4.9 0 0 1 0 6.9z"/></svg>` +
+    `赞</button>` +
+    `<span class="pop-sep" aria-hidden="true"></span>` +
+    `<button class="pop-btn" type="button" data-act="comment">` +
+    `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.2A3.2 3.2 0 0 1 7.2 3h9.6A3.2 3.2 0 0 1 20 6.2v6.4a3.2 3.2 0 0 1-3.2 3.2H9.9l-3.6 3.2a.7.7 0 0 1-1.2-.5z"/></svg>` +
+    `评论</button>` +
+    `</div>`
+  );
+}
+
 export function renderMoment(memo, profile) {
   const media = mediaOf(memo);
   const body = renderContent(memo.content, { hideTags: CONFIG.HIDE_TAGS });
@@ -206,6 +250,7 @@ export function renderMoment(memo, profile) {
     `<div class="meta">` +
     `<time datetime="${memo.createTime}">${timeText(memo.createTime)}</time>` +
     `<button class="more-btn" data-more="${escapeHtml(memo.name)}" aria-label="赞和评论"><i></i><i></i><i></i></button>` +
+    popoverHtml() +
     `</div>` +
     `<div class="drawer" data-drawer="${escapeHtml(memo.name)}"></div>` +
     `</div>` +

@@ -56,6 +56,8 @@ body {
   font-size: 16px;
   line-height: 1.5;
   overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 img {
@@ -257,7 +259,7 @@ a {
 .cover-avatar {
   width: 62px;
   height: 62px;
-  border-radius: 8px;
+  border-radius: 5px;
   object-fit: cover;
   background: var(--avatar-bg);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
@@ -335,6 +337,29 @@ a {
   background: var(--drawer);
   padding: 1px 4px;
   border-radius: 3px;
+}
+
+/* 代码块：朋友圈没有代码样式，这里给一个浅底块，避免挤成一行 */
+.moment-text .md-code {
+  display: block;
+  margin: 6px 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+/* 分割线：Memos 里用 ---- / —- / *** 单独成行，渲染成一条细线 */
+.moment-text .md-hr {
+  height: 1px;
+  margin: 12px 0;
+  border: 0;
+  background: var(--line);
+}
+
+.moment-text del {
+  color: var(--text-2);
 }
 
 .moment-text.is-folded {
@@ -595,6 +620,7 @@ a {
 /* ------------------------------------------------------------------ 时间与操作 */
 
 .meta {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -629,6 +655,91 @@ a {
 
 .more-btn:active {
   background: var(--line);
+}
+
+/* ------------------------------------------------------------------ 赞/评论浮层
+   微信：点「…」在按钮下方弹出深色圆角块，赞 | 评论 两个动作，右上小三角指向按钮 */
+
+.popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 6;
+  display: flex;
+  align-items: stretch;
+  background: rgba(42, 42, 42, 0.96);
+  border-radius: 5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  animation: popover-in 0.14s ease-out;
+}
+
+.popover[hidden] {
+  display: none;
+}
+
+.popover::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: 11px;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-top: 0;
+  border-bottom-color: rgba(42, 42, 42, 0.96);
+}
+
+.pop-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 15px;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pop-btn:first-child {
+  border-radius: 5px 0 0 5px;
+}
+
+.pop-btn:last-child {
+  border-radius: 0 5px 5px 0;
+}
+
+.pop-btn:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.pop-btn svg {
+  flex: 0 0 auto;
+  opacity: 0.92;
+}
+
+.pop-sep {
+  width: 0.5px;
+  margin: 8px 0;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+:root[data-theme="dark"] .popover {
+  background: rgba(62, 62, 62, 0.97);
+}
+
+:root[data-theme="dark"] .popover::before {
+  border-bottom-color: rgba(62, 62, 62, 0.97);
 }
 
 /* ------------------------------------------------------------------ 赞与评论 */
@@ -696,7 +807,7 @@ a {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
   column-gap: 12px;
-  padding: 0 16px 22px;
+  padding: 0 16px 18px;
 }
 
 .skeleton + .skeleton {
@@ -878,6 +989,19 @@ a {
   animation: viewer-fade 0.18s ease;
 }
 
+/* 收回缩略图时背景一起淡出，别出现「黑屏一闪」 */
+.viewer.is-closing {
+  background: transparent;
+  transition: background-color 0.22s ease;
+}
+
+.viewer.is-closing .viewer-close,
+.viewer.is-closing .viewer-count,
+.viewer.is-closing .viewer-arrow {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
 @keyframes viewer-fade {
   from {
     opacity: 0;
@@ -988,6 +1112,14 @@ a {
   background: rgba(255, 255, 255, 0.26);
 }
 
+/* 第一张没有上一张、最后一张没有下一张（同微信，不循环） */
+.viewer-arrow.is-off,
+.viewer-arrow.is-off:hover {
+  opacity: 0.14;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
 .viewer-arrow[hidden] {
   display: none;
 }
@@ -1058,7 +1190,7 @@ a {
   .cover-avatar {
     width: 72px;
     height: 72px;
-    border-radius: 10px;
+    border-radius: 6px;
   }
 
   .cover-name {
