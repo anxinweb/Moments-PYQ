@@ -421,6 +421,109 @@ a {
   z-index: 1;
 }
 
+/* ------------------------------------------------------------------ 视频 / 音频 / 附件 */
+
+.media {
+  margin-top: 8px;
+}
+
+.media-video video {
+  display: block;
+  max-width: 100%;
+  max-height: 62vh;
+  border-radius: 4px;
+  background: #000;
+}
+
+.media-audio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 300px);
+  padding: 8px 12px 8px 8px;
+  margin-top: 8px;
+  background: var(--drawer);
+  border-radius: 6px;
+}
+
+.audio-play {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--link);
+  color: #fff;
+  transition: transform 0.12s ease;
+}
+
+.audio-play:active {
+  transform: scale(0.92);
+}
+
+.audio-play .ic-pause {
+  display: none;
+}
+
+.media-audio.is-playing .audio-play .ic-play {
+  display: none;
+}
+
+.media-audio.is-playing .audio-play .ic-pause {
+  display: block;
+}
+
+.audio-bars {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.audio-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--link);
+}
+
+.audio-time {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.media-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--drawer);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.media-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-file-size {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
 /* ------------------------------------------------------------------ 时间与操作 */
 
 .meta {

@@ -161,6 +161,54 @@ function setupFolding(root) {
   });
 }
 
+const fmtTime = (s) => {
+  if (!isFinite(s) || s < 0) return '0:00';
+  return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+};
+
+/** 音频卡片：播放/暂停、进度、时长，同一时间只播一条 */
+function bindAudio(card) {
+  const audio = card.querySelector('audio');
+  const btn = card.querySelector('.audio-play');
+  const fill = card.querySelector('.audio-fill');
+  const label = card.querySelector('.audio-time');
+  if (!audio || !btn) return;
+
+  const paint = () => {
+    const dur = isFinite(audio.duration) ? audio.duration : 0;
+    const cur = audio.currentTime || 0;
+    fill.style.width = dur ? (cur / dur) * 100 + '%' : '0%';
+    label.textContent = cur > 0.2 ? `${fmtTime(cur)} / ${fmtTime(dur)}` : fmtTime(dur);
+  };
+
+  audio.addEventListener('loadedmetadata', paint);
+  audio.addEventListener('timeupdate', paint);
+  audio.addEventListener('play', () => {
+    card.classList.add('is-playing');
+    paint();
+  });
+  audio.addEventListener('pause', () => {
+    card.classList.remove('is-playing');
+    paint();
+  });
+  audio.addEventListener('ended', () => {
+    card.classList.remove('is-playing');
+    fill.style.width = '0%';
+    paint();
+  });
+
+  btn.addEventListener('click', () => {
+    if (audio.paused) {
+      document.querySelectorAll('.media-audio audio').forEach((a) => {
+        if (a !== audio) a.pause();
+      });
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  });
+}
+
 function bindMoment(node) {
   node.querySelectorAll('.cell').forEach((cell) => {
     cell.addEventListener('click', () => {
@@ -178,12 +226,17 @@ function bindMoment(node) {
       toast('点赞与评论将在下一步接入');
     });
   }
+
+  node.querySelectorAll('.media-audio').forEach(bindAudio);
 }
 
 /* --------------------------------------------------------------- 分页加载 */
 
 /** 首屏请求预热占位：boot 时发起，loadOnePage 直接复用 */
 let firstPageTask = null;
+
+/** 下一页预取：当前页渲染完就提前拉下一页，点「加载更多」几乎无等待 */
+let nextPageTask = null;
 
 function pageFromUrl() {
   const n = parseInt(new URLSearchParams(location.search).get('page') || '1', 10);
@@ -229,9 +282,17 @@ async function loadOnePage() {
 
   try {
     const token = state.tokens[state.loadedPages] || '';
-    // 首屏数据可能在 boot 时已提前发起，直接复用，省掉一次往返
-    const req = firstPageTask || getMemos({ pageToken: token });
-    firstPageTask = null;
+    // 首屏与下一页都可能已提前发起，直接复用，点击即可秒出
+    let req;
+    if (firstPageTask) {
+      req = firstPageTask;
+      firstPageTask = null;
+    } else if (nextPageTask && nextPageTask.page === state.loadedPages) {
+      req = nextPageTask.promise;
+      nextPageTask = null;
+    } else {
+      req = getMemos({ pageToken: token });
+    }
     const { memos, nextPageToken } = await req;
 
     if (!memos.length && state.loadedPages === 0) {
@@ -249,6 +310,17 @@ async function loadOnePage() {
     syncUrl();
 
     if (state.loadedPages === 1) pickCoverFromMemos(memos);
+
+    // 后台预取下一页（只提前一页，避免浪费流量）
+    if (nextPageToken) {
+      nextPageTask = {
+        page: state.loadedPages,
+        promise: getMemos({ pageToken: nextPageToken }),
+      };
+      nextPageTask.promise.catch(() => {
+        nextPageTask = null;
+      });
+    }
   } catch (err) {
     console.error('[feed]', err);
     state.failed = true;
@@ -371,22 +443,26 @@ function applyViewerTransform() {
   const zoomed = viewer.scale > 1.01;
   el.viewer.classList.toggle('is-zoom', zoomed);
   el.viewerImg.classList.toggle('is-zoom', zoomed);
-  el.viewerImg.style.transform = zoomed
+  const shifted = viewer.panX !== 0 || viewer.panY !== 0 || zoomed;
+  el.viewerImg.style.transform = shifted
     ? `translate3d(${viewer.panX}px, ${viewer.panY}px, 0) scale(${viewer.scale})`
     : '';
 }
 
-/** 限制拖动范围，图片边缘不会被拖进画面里出现空白 */
+/** 限制拖动范围，返回被裁掉的溢出量（用于「拖到边界继续拖 = 切图」） */
 function clampPan() {
   if (viewer.scale <= 1.01) {
     viewer.panX = 0;
     viewer.panY = 0;
-    return;
+    return { x: 0, y: 0 };
   }
   const maxX = Math.max(0, (el.viewerImg.clientWidth * viewer.scale - el.viewerStage.clientWidth) / 2);
   const maxY = Math.max(0, (el.viewerImg.clientHeight * viewer.scale - el.viewerStage.clientHeight) / 2);
+  const rawX = viewer.panX;
+  const rawY = viewer.panY;
   viewer.panX = Math.min(maxX, Math.max(-maxX, viewer.panX));
   viewer.panY = Math.min(maxY, Math.max(-maxY, viewer.panY));
+  return { x: rawX - viewer.panX, y: rawY - viewer.panY };
 }
 
 /** 以某个屏幕点为中心缩放；不传坐标就围绕图片中心 */
@@ -422,6 +498,7 @@ function stepViewer(delta) {
   viewer.scale = 1;
   viewer.panX = 0;
   viewer.panY = 0;
+  el.viewer.style.background = '';
   paintViewer();
 }
 
@@ -433,6 +510,7 @@ function closeViewer() {
   el.viewer.classList.remove('is-zoom');
   el.viewer.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
+  el.viewer.style.background = '';
   el.viewerImg.removeAttribute('src');
 }
 
@@ -450,6 +528,7 @@ function initViewer() {
   let downY = 0;
   let downAt = 0;
   let moved = false;
+  let edgeX = 0;
   let pinchDist = 0;
   let pinchScale = 1;
   let pinchMidX = 0;
@@ -466,6 +545,7 @@ function initViewer() {
 
     pointers.set(e.pointerId, at(e));
     moved = false;
+    edgeX = 0;
 
     if (pointers.size === 1) {
       downX = e.clientX;
@@ -510,13 +590,23 @@ function initViewer() {
     const dy = e.clientY - downY;
     if (Math.abs(dx) + Math.abs(dy) > 8) moved = true;
 
-    // 放大状态下单指拖动
     if (viewer.scale > 1.01) {
+      // 放大态：单指拖动，拖到边界继续拖会攒溢出量，松手即切图（同微信）
       viewer.panX += e.clientX - prev.x;
       viewer.panY += e.clientY - prev.y;
-      clampPan();
+      const over = clampPan();
+      if (over.x) edgeX = over.x;
       el.viewerImg.classList.add('is-panning');
       applyViewerTransform();
+      return;
+    }
+
+    // 未放大：纵向下拉跟手，用来关闭（同微信）
+    if (dy > 4 && Math.abs(dy) > Math.abs(dx)) {
+      viewer.panY = Math.min(dy * 0.92, 280);
+      el.viewerImg.classList.add('is-panning');
+      applyViewerTransform();
+      el.viewer.style.background = `rgba(0, 0, 0, ${Math.max(0.25, 1 - viewer.panY / 460)})`;
     }
   });
 
@@ -549,10 +639,28 @@ function initViewer() {
       applyViewerTransform();
     }
 
-    // 放大状态：轻点还原原始大小
+    // 放大状态：拖到边界继续拖 → 切图（同微信）；轻点还原原始大小
     if (viewer.scale > 1.01) {
+      if (Math.abs(edgeX) > 70 && Math.abs(edgeX) > Math.abs(dy)) {
+        const dir = edgeX > 0 ? -1 : 1;
+        edgeX = 0;
+        stepViewer(dir);
+        return;
+      }
+      edgeX = 0;
       if (isTap && quick) zoomTo(1);
       return;
+    }
+
+    // 未放大时下拉超过阈值 → 关闭（同微信）
+    if (viewer.panY > 110) {
+      closeViewer();
+      return;
+    }
+    if (viewer.panY) {
+      viewer.panY = 0;
+      el.viewer.style.background = '';
+      applyViewerTransform();
     }
 
     // 左右滑动切图
@@ -585,6 +693,19 @@ function initViewer() {
     if (viewer.scale > 1.01) zoomTo(1);
     else zoomTo(ZOOM_STEP, e.clientX, e.clientY);
   });
+
+  // 桌面滚轮缩放（微信 PC 版同样支持）
+  el.viewerStage.addEventListener(
+    'wheel',
+    (e) => {
+      if (!viewer.open) return;
+      e.preventDefault();
+      if (viewer.scale <= 1.01 && e.deltaY > 0) return;
+      const next = viewer.scale * (e.deltaY < 0 ? 1.14 : 1 / 1.14);
+      zoomTo(next, e.clientX, e.clientY);
+    },
+    { passive: false }
+  );
 
   el.viewerStage.addEventListener('pointercancel', (e) => {
     pointers.delete(e.pointerId);

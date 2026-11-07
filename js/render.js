@@ -77,10 +77,62 @@ export function timeText(iso) {
   return d.getFullYear() === now.getFullYear() ? md : `${d.getFullYear()}年${md}`;
 }
 
+export function mediaOf(memo) {
+  const atts = (memo.attachments || []).map((a) => ({
+    url: attachmentUrl(a),
+    name: a.filename || '',
+    type: a.type || '',
+    size: a.size || 0,
+  }));
+  return {
+    images: atts.filter((a) => a.type.startsWith('image/')),
+    videos: atts.filter((a) => a.type.startsWith('video/')),
+    audios: atts.filter((a) => a.type.startsWith('audio/')),
+    files: atts.filter((a) => !/^(image|video|audio)\//.test(a.type)),
+  };
+}
+
 export function imagesOf(memo) {
-  return (memo.attachments || [])
-    .filter((a) => (a.type || '').startsWith('image/'))
-    .map((a) => ({ url: attachmentUrl(a), name: a.filename }));
+  return mediaOf(memo).images.map((a) => ({ url: a.url, name: a.name }));
+}
+
+function bytesText(n) {
+  if (!n) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
+  return (n / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+function videoHtml(v) {
+  return (
+    `<div class="media media-video">` +
+    `<video src="${v.url}" controls playsinline preload="metadata" data-media></video>` +
+    `</div>`
+  );
+}
+
+function audioHtml(a) {
+  return (
+    `<div class="media-audio" data-audio>` +
+    `<button class="audio-play" type="button" aria-label="播放音频">` +
+    `<svg class="ic-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10-6.8a1 1 0 0 0 0-1.8l-10-6.8A1 1 0 0 0 8 5.2z"/></svg>` +
+    `<svg class="ic-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"/></svg>` +
+    `</button>` +
+    `<span class="audio-bars"><span class="audio-fill"></span></span>` +
+    `<span class="audio-time">0:00</span>` +
+    `<audio src="${a.url}" preload="metadata"></audio>` +
+    `</div>`
+  );
+}
+
+function fileHtml(f) {
+  return (
+    `<a class="media-file" href="${f.url}" target="_blank" rel="noopener noreferrer">` +
+    `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V8z"/><path d="M14 3v5h5"/></svg>` +
+    `<span class="media-file-name">${escapeHtml(f.name || '附件')}</span>` +
+    (f.size ? `<span class="media-file-size">${bytesText(f.size)}</span>` : '') +
+    `</a>`
+  );
 }
 
 function gridHtml(images) {
@@ -102,7 +154,7 @@ function gridHtml(images) {
 }
 
 export function renderMoment(memo, profile) {
-  const imageList = imagesOf(memo);
+  const media = mediaOf(memo);
   const body = renderContent(memo.content, { hideTags: CONFIG.HIDE_TAGS });
   const hasText = body.trim().length > 0;
   const name = profile?.name || CONFIG.NICKNAME;
@@ -114,7 +166,10 @@ export function renderMoment(memo, profile) {
     `<div class="moment-body">` +
     `<h2 class="moment-name">${escapeHtml(name)}</h2>` +
     (hasText ? `<div class="moment-text is-folded">${body}</div>` : '') +
-    (imageList.length ? gridHtml(imageList) : '') +
+    (media.images.length ? gridHtml(media.images) : '') +
+    media.videos.map(videoHtml).join('') +
+    media.audios.map(audioHtml).join('') +
+    media.files.map(fileHtml).join('') +
     `<div class="meta">` +
     `<time datetime="${memo.createTime}">${timeText(memo.createTime)}</time>` +
     `<button class="more-btn" data-more="${escapeHtml(memo.name)}" aria-label="赞和评论"><i></i><i></i><i></i></button>` +
