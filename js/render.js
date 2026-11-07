@@ -254,8 +254,33 @@ export function renderMoment(memo, profile, opts = {}) {
     popoverHtml() +
     `</div>` +
     `<div class="drawer" data-drawer="${escapeHtml(memo.name)}"></div>` +
+    commentInlineHtml() +
     `</div>` +
     `</article>`
+  );
+}
+
+/** 内联评论输入（微信同款：点「评论」后在动态下方就地展开） */
+export function commentInlineHtml() {
+  return (
+    `<div class="comment-inline" hidden>` +
+    `<div class="comment-nick-row">` +
+    `<span class="comment-nick-label">昵称</span>` +
+    `<input class="comment-nick" placeholder="给自己起个名字" maxlength="12" autocomplete="nickname" enterkeyhint="next">` +
+    `<svg class="comment-nick-pen" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>` +
+    `</div>` +
+    `<div class="comment-box">` +
+    `<textarea class="comment-input" placeholder="评论" maxlength="500" rows="2"></textarea>` +
+    `<div class="comment-tools">` +
+    `<div class="comment-emos">` +
+    `<button type="button" aria-label="语音"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 19v3"/></svg></button>` +
+    `<button type="button" aria-label="表情"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><line x1="9" y1="9.5" x2="9.01" y2="9.5"/><line x1="15" y1="9.5" x2="15.01" y2="9.5"/></svg></button>` +
+    `<button type="button" aria-label="图片"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>` +
+    `</div>` +
+    `<button class="comment-send" type="button" disabled>发送</button>` +
+    `</div>` +
+    `</div>` +
+    `</div>`
   );
 }
 

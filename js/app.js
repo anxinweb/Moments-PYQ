@@ -42,11 +42,6 @@ const el = {
   viewerClose: $('viewerClose'),
   viewerPrev: $('viewerPrev'),
   viewerNext: $('viewerNext'),
-  commentBar: $('commentBar'),
-  commentNick: $('commentNick'),
-  commentInput: $('commentInput'),
-  commentSend: $('commentSend'),
-  commentEmos: $('commentEmos'),
 };
 
 const DESKTOP_MQ = window.matchMedia('(min-width: 768px)');
@@ -333,7 +328,7 @@ function bindMoment(node, opts = {}) {
           btn.disabled = false;
         }
       } else {
-        openCommentBar(uid);
+        openInlineComment(node, uid);
       }
     });
   }
@@ -343,11 +338,12 @@ function bindMoment(node, opts = {}) {
   if (drawer) {
     drawer.addEventListener('click', () => {
       const uid = (node.dataset.name || '').split('/')[1];
-      if (uid) openCommentBar(uid);
+      if (uid) openInlineComment(node, uid);
     });
   }
 
   node.querySelectorAll('.media-audio').forEach(bindAudio);
+  bindCommentInline(node);
 }
 
 /* --------------------------------------------------------------- 赞/评论浮层 */
@@ -409,88 +405,108 @@ async function refreshComments(uid) {
   }
 }
 
-/* --------------------------------------------------------------- 评论输入条 */
+/* --------------------------------------------------------------- 内联评论输入
+   微信同款：点「评论」后输入框在【那条动态下方】就地展开，不是底部弹条 */
 
-let commentTargetUid = '';
+let commentNode = null; // 当前展开输入框的 .moment 节点
 
-function openCommentBar(uid) {
-  commentTargetUid = uid;
+function openInlineComment(node, uid) {
+  if (commentNode && commentNode !== node) closeInlineComment();
+  const box = node.querySelector('.comment-inline');
+  if (!box) return;
+  commentNode = node;
+  const nick = box.querySelector('.comment-nick');
+  const input = box.querySelector('.comment-input');
+  const send = box.querySelector('.comment-send');
   // 昵称行常显：填过就直接带出，随时可以改名
-  el.commentNick.value = getNickname();
-  el.commentInput.value = '';
-  el.commentSend.disabled = true;
-  el.commentBar.hidden = false;
+  nick.value = getNickname();
+  input.value = '';
+  send.disabled = true;
+  box.hidden = false;
   // 移动端需要用户手势内 focus 才能唤起键盘，这里在同一次点击里聚焦
-  el.commentInput.focus();
+  input.focus();
+  // 确保输入框出现在可视区域内（键盘弹起时不被遮挡）
+  setTimeout(() => box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 120);
 }
 
-function closeCommentBar() {
-  commentTargetUid = '';
-  el.commentBar.hidden = true;
-  el.commentInput.blur();
-  el.commentNick.blur();
+function closeInlineComment() {
+  if (!commentNode) return;
+  const box = commentNode.querySelector('.comment-inline');
+  if (box) box.hidden = true;
+  commentNode = null;
 }
 
-async function sendComment() {
-  if (!commentTargetUid) return;
-  const name = el.commentNick.value.trim();
-  const text = el.commentInput.value.trim();
+async function sendComment(node, uid) {
+  const box = node.querySelector('.comment-inline');
+  if (!box) return;
+  const nick = box.querySelector('.comment-nick');
+  const input = box.querySelector('.comment-input');
+  const send = box.querySelector('.comment-send');
+  const name = nick.value.trim();
+  const text = input.value.trim();
   if (!name) {
     toast('先给自己起个昵称吧');
-    el.commentNick.focus();
+    nick.focus();
     return;
   }
   if (!text) {
     toast('说点什么再发送吧');
-    el.commentInput.focus();
+    input.focus();
     return;
   }
-  el.commentSend.disabled = true;
+  send.disabled = true;
   try {
     setNickname(name);
-    await postComment(commentTargetUid, name, text);
-    const uid = commentTargetUid;
-    closeCommentBar();
+    await postComment(uid, name, text);
+    closeInlineComment();
     toast('已提交，审核通过后会显示');
     refreshComments(uid);
   } catch (err) {
     console.warn('[comment]', err);
     toast('发送失败，稍后再试');
-  } finally {
-    el.commentSend.disabled = false;
+    send.disabled = false;
   }
 }
 
-function initCommentBar() {
-  el.commentSend.addEventListener('click', sendComment);
+/** 每条动态渲染后绑定各自的内联评论输入 */
+function bindCommentInline(node) {
+  const box = node.querySelector('.comment-inline');
+  if (!box) return;
+  const uid = () => (node.dataset.name || '').split('/')[1];
+  const input = box.querySelector('.comment-input');
+  const send = box.querySelector('.comment-send');
+  send.addEventListener('click', () => sendComment(node, uid()));
   // 有字才亮「发送」（同微信）
-  el.commentInput.addEventListener('input', () => {
-    el.commentSend.disabled = el.commentInput.value.trim().length === 0;
+  input.addEventListener('input', () => {
+    send.disabled = input.value.trim().length === 0;
   });
-  el.commentInput.addEventListener('keydown', (e) => {
+  input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendComment();
+      sendComment(node, uid());
     }
   });
-  el.commentNick.addEventListener('keydown', (e) => {
+  box.querySelector('.comment-nick').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      el.commentInput.focus();
+      input.focus();
     }
   });
   // 语音/表情/图片占位图标（微信同款外观，功能暂未开放）
-  el.commentEmos.querySelectorAll('button').forEach((b) => {
+  box.querySelectorAll('.comment-emos button').forEach((b) => {
     b.addEventListener('click', () => toast('暂不支持语音 / 表情 / 图片评论'));
   });
+}
+
+function initCommentBar() {
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeCommentBar();
+    if (e.key === 'Escape') closeInlineComment();
   });
-  // 点输入条以外的空白处收起（点浮层/九宫格等正常交互不受影响）
+  // 点输入框以外的空白处收起（点浮层/评论区/九宫格等正常交互不受影响）
   document.addEventListener('click', (e) => {
-    if (el.commentBar.hidden) return;
-    if (e.target.closest('.comment-bar, .popover, .more-btn')) return;
-    closeCommentBar();
+    if (!commentNode) return;
+    if (e.target.closest('.comment-inline, .popover, .more-btn, .drawer')) return;
+    closeInlineComment();
   });
 }
 

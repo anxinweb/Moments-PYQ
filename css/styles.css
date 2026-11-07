@@ -838,20 +838,11 @@ a {
   color: var(--text);
 }
 
-/* ------------------------------------------------------------------ 评论输入条
-   微信样式：底部深色条 + 大圆角输入框（占位「评论」）+ 麦克风/表情/图片 + 发送 */
+/* ------------------------------------------------------------------ 内联评论输入
+   微信同款：点「评论」后在动态下方就地展开（非底部弹条） */
 
-.comment-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 35;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-  background: var(--nav-solid);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  border-top: 0.5px solid var(--line);
+.comment-inline {
+  margin-top: 8px;
 }
 
 /* 昵称行：已填过也会显示，随时可改（带小铅笔） */
