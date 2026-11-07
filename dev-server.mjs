@@ -279,7 +279,7 @@ async function handleComments(url, req, res) {
       const r = await fetch(`${UPSTREAM}/api/memos/${target}/comments`, {
         method: 'POST',
         headers: { authorization: 'Bearer ' + MEMOS_TOKEN, 'content-type': 'application/json' },
-        body: JSON.stringify({ content, visibility: 'PRIVATE' }),
+        body: JSON.stringify({ content, visibility: 'PROTECTED' }), // 待审：匿名不可见 + 邮件通知可发
       });
       if (!r.ok) return send(res, 502, { error: 'memos_rejected' });
       const created = await r.json().catch(() => null);

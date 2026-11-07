@@ -8,12 +8,13 @@ export const config = { runtime: 'edge' };
  *
  * GET  /api/comments?uids=a,b,c
  *      → { comments: { [uid]: [ { uid, name, url, text, time, replies: [...] } ] } }
- *      只返回 PUBLIC（= 已过审）的评论；PRIVATE = 待审，未过审不对外可见。
+ *      只返回 PUBLIC（= 已过审）的评论；PROTECTED = 待审，未过审不对外可见。
  *      replies 里是二级回复：{ uid, name, url, text, time, replyName }
  *      replyName 非空表示「回复@某某」（该回复本身指向另一条二级回复）
  *
  * POST /api/comments { uid, name, url, text, replyTo?, replyName? }
- *      以 PRIVATE（待审）创建；你在 Memos 里把它改成「公开」即过审上架。
+ *      以 PROTECTED（待审）创建；你在 Memos 里把它改成「公开」即过审上架。
+ *      待审用 PROTECTED 而不是 PRIVATE：匿名同样看不到，但 Memos 会发邮件通知。
  *      replyTo = 被回复的一级评论 uid（回复永远挂在一级评论下，最多两级）；
  *      replyName = 被回复人昵称（仅用于展示「回复@某某：」）。
  *
@@ -158,7 +159,10 @@ export default async function handler(request) {
         headers: { authorization: 'Bearer ' + TOKEN, 'content-type': 'application/json' },
         body: JSON.stringify({
           content,
-          visibility: 'PRIVATE', // 私有 = 待审核
+          // PROTECTED（登录可见）= 待审核：匿名访客看不到，效果同 PRIVATE；
+          // 但 Memos 的邮件通知只对 PRIVATE 一律不发、PROTECTED 会发——
+          // 用 PROTECTED 让「待审评论」也能触发邮件通知，提醒站主去过审。
+          visibility: 'PROTECTED',
         }),
       });
       if (!res.ok) return json({ error: 'memos_rejected' }, 502);
