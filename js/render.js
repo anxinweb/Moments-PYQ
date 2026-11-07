@@ -264,10 +264,18 @@ export function renderMoment(memo, profile, opts = {}) {
 export function commentInlineHtml() {
   return (
     `<div class="comment-inline" hidden>` +
+    `<div class="comment-reply-bar" hidden>` +
+    `<span class="comment-reply-txt"></span>` +
+    `<button class="comment-reply-x" type="button" aria-label="取消回复"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>` +
+    `</div>` +
     `<div class="comment-nick-row">` +
     `<span class="comment-nick-label">昵称</span>` +
     `<input class="comment-nick" placeholder="给自己起个名字" maxlength="12" autocomplete="nickname" enterkeyhint="next">` +
     `<svg class="comment-nick-pen" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>` +
+    `</div>` +
+    `<div class="comment-nick-row comment-link-row">` +
+    `<span class="comment-nick-label">主页</span>` +
+    `<input class="comment-link" type="url" inputmode="url" placeholder="选填，别人点你昵称会跳过去" maxlength="300" autocomplete="url" enterkeyhint="next">` +
     `</div>` +
     `<div class="comment-box">` +
     `<textarea class="comment-input" placeholder="评论" maxlength="500" rows="2"></textarea>` +
@@ -277,14 +285,47 @@ export function commentInlineHtml() {
     `<button type="button" aria-label="表情"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><line x1="9" y1="9.5" x2="9.01" y2="9.5"/><line x1="15" y1="9.5" x2="15.01" y2="9.5"/></svg></button>` +
     `<button type="button" aria-label="图片"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>` +
     `</div>` +
+    `<div class="comment-actions">` +
+    `<button class="comment-cancel" type="button">取消</button>` +
     `<button class="comment-send" type="button" disabled>发送</button>` +
+    `</div>` +
     `</div>` +
     `</div>` +
     `</div>`
   );
 }
 
-/** 微信样式的赞/评论灰底框：♥ 昵称们 + 每条评论「昵称：内容」 */
+/** 评论里的昵称：有主页链接就渲染成可点的链接 */
+function whoHtml(name, url) {
+  return url
+    ? `<a class="who" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>`
+    : `<span class="who">${escapeHtml(name)}</span>`;
+}
+
+/** 评论文本：转义 + 网址自动变链接（仅 http/https，防注入） */
+function commentTextHtml(text) {
+  return linkify(escapeHtml(String(text || '')));
+}
+
+function commentItemHtml(c, isReply) {
+  const replyPrefix = c.replyName
+    ? `<span class="reply-to">回复@${escapeHtml(c.replyName)}：</span>`
+    : '';
+  const badge = c.pending ? `<span class="pending-badge">审核中</span>` : '';
+  return (
+    `<div class="comment${c.pending ? ' is-pending' : ''}${isReply ? ' is-reply' : ''}" data-cuid="${escapeHtml(c.uid || '')}" data-cname="${escapeHtml(c.name || '')}">` +
+    whoHtml(c.name, c.url) +
+    replyPrefix +
+    `<span class="c-text">${commentTextHtml(c.text)}</span>` +
+    badge +
+    (c.replies && c.replies.length
+      ? `<div class="comment-replies">${c.replies.map((r) => commentItemHtml(r, true)).join('')}</div>`
+      : '') +
+    `</div>`
+  );
+}
+
+/** 微信样式的赞/评论灰底框：♥ 昵称们 + 两级评论「昵称：内容」/「昵称 回复@某某：内容」 */
 export function drawerHtml(likes, comments) {
   const hasLikes = likes && likes.count > 0;
   const list = comments || [];
@@ -292,19 +333,24 @@ export function drawerHtml(likes, comments) {
 
   let out = '';
   if (hasLikes) {
+    const nameHtml = (likes.names || [])
+      .map((n) =>
+        typeof n === 'string'
+          ? escapeHtml(n) // 旧数据兼容
+          : n.u
+            ? `<a href="${escapeHtml(n.u)}" target="_blank" rel="noopener noreferrer">${escapeHtml(n.n)}</a>`
+            : escapeHtml(n.n)
+      )
+      .join('、');
     out +=
       `<div class="drawer-likes">` +
       `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.6 4.7 13.3a4.9 4.9 0 0 1 0-6.9 4.7 4.7 0 0 1 6.6 0l.7.8.7-.8a4.7 4.7 0 0 1 6.6 0 4.9 4.9 0 0 1 0 6.9z"/></svg>` +
-      `<span class="names">${(likes.names || []).map((n) => escapeHtml(n)).join('、')}</span>` +
+      `<span class="names">${nameHtml}</span>` +
       `</div>`;
   }
   if (list.length) {
     if (hasLikes) out += `<div class="drawer-sep"></div>`;
-    out += `<div class="drawer-comments">`;
-    for (const c of list) {
-      out += `<div class="comment"><span class="who">${escapeHtml(c.name)}</span>${escapeHtml(c.text)}</div>`;
-    }
-    out += `</div>`;
+    out += `<div class="drawer-comments">` + list.map((c) => commentItemHtml(c, false)).join('') + `</div>`;
   }
   return out;
 }

@@ -114,6 +114,22 @@ async function upstash(commands) {
   return data.map((x) => (x && typeof x === 'object' && 'result' in x ? x.result : x));
 }
 
+/** value → { n, u }：JSON 新格式 / 纯昵称旧格式 */
+function parseNameValue(v) {
+  const s = String(v || '');
+  if (s.startsWith('{')) {
+    try {
+      const o = JSON.parse(s);
+      if (o && typeof o.n === 'string') {
+        return { n: o.n.slice(0, 12), u: /^https?:\/\/\S{1,300}$/i.test(o.u || '') ? o.u : '' };
+      }
+    } catch {
+      /* 旧数据兜底 */
+    }
+  }
+  return { n: s.slice(0, 12) || '访客', u: '' };
+}
+
 function parseUids(url) {
   return (url.searchParams.get('uids') || '')
     .split(',')
@@ -137,7 +153,7 @@ async function handleLikes(url, req, res) {
       const results = await upstash(commands);
       const likes = {};
       uids.forEach((uid, i) => {
-        const names = results[i * 2] || [];
+        const names = (results[i * 2] || []).map(parseNameValue);
         likes[uid] = { count: names.length, names, liked: visitor ? Boolean(results[i * 2 + 1]) : false };
       });
       return send(res, 200, { likes });
@@ -147,11 +163,14 @@ async function handleLikes(url, req, res) {
       const uid = String(body.uid || '').replace(/[^a-zA-Z0-9_-]/g, '');
       const visitor = String(body.visitor || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64);
       const name = String(body.name || '').replace(/[\r\n\t]/g, '').slice(0, 12) || '访客';
+      const link = String(body.url || '').trim();
+      const url2 = /^https?:\/\/\S{1,300}$/i.test(link) ? link : '';
       const on = body.on !== false;
       if (!uid || !visitor) return send(res, 400, { error: 'bad_request' });
       const key = 'like:' + uid;
-      const results = await upstash([on ? ['HSET', key, visitor, name] : ['HDEL', key, visitor], ['HVALS', key]]);
-      const names = results[1] || [];
+      const value = url2 ? JSON.stringify({ n: name, u: url2 }) : name;
+      const results = await upstash([on ? ['HSET', key, visitor, value] : ['HDEL', key, visitor], ['HVALS', key]]);
+      const names = (results[1] || []).map(parseNameValue);
       return send(res, 200, { ok: true, count: names.length, names, liked: on });
     }
     return send(res, 405, { error: 'method_not_allowed' });
@@ -161,7 +180,29 @@ async function handleLikes(url, req, res) {
   }
 }
 
-/* ---------------- 评论（Memos，先审后发） ---------------- */
+/* ---------------- 评论（Memos，先审后发，原生两级） ---------------- */
+
+const NAME_RE = /^\[([^\]\n]{1,24})\](?:\((https?:\/\/[^)\s]{1,300})\))?\s?/;
+const REPLY_RE = /^回复@([^：:\n]{1,24})[：:]\s*/;
+const byTime = (a, b) => (a.time < b.time ? -1 : 1);
+
+function parseComment(raw) {
+  const content = String(raw.content || '');
+  const m = NAME_RE.exec(content);
+  const item = {
+    uid: (raw.name || '').split('/')[1] || '',
+    name: m ? m[1] : '访客',
+    url: m && m[2] ? m[2] : '',
+    text: m ? content.slice(m[0].length) : content,
+    time: raw.createTime || '',
+  };
+  const r = REPLY_RE.exec(item.text);
+  if (r) {
+    item.replyName = r[1];
+    item.text = item.text.slice(r[0].length);
+  }
+  return item;
+}
 
 async function handleComments(url, req, res) {
   try {
@@ -174,17 +215,33 @@ async function handleComments(url, req, res) {
             const r = await fetch(`${UPSTREAM}/api/memos/${uid}/comments`, { headers: { accept: 'application/json' } });
             if (!r.ok) return [uid, []];
             const data = await r.json();
-            const list = (data.comments || [])
-              .filter((c) => c.visibility === 'PUBLIC' && c.state !== 'ARCHIVED')
-              .map((c) => {
-                const m = /^\[([^\]\n]{1,12})\]\s?/.exec(c.content || '');
-                return {
-                  name: m ? m[1] : '访客',
-                  text: m ? String(c.content).slice(m[0].length) : String(c.content || ''),
-                  time: c.createTime || '',
-                };
+            const raws = (data.comments || []).filter(
+              (c) => c.visibility === 'PUBLIC' && c.state !== 'ARCHIVED'
+            );
+            const list = raws.map(parseComment);
+            await Promise.all(
+              list.map(async (item, i) => {
+                item.replies = [];
+                const hasReplies = (raws[i].relations || []).some(
+                  (x) => x.type === 'COMMENT' && x.memo && x.memo.name !== raws[i].name
+                );
+                if (!hasReplies) return;
+                try {
+                  const r2 = await fetch(`${UPSTREAM}/api/memos/${item.uid}/comments`, {
+                    headers: { accept: 'application/json' },
+                  });
+                  if (!r2.ok) return;
+                  const d2 = await r2.json();
+                  item.replies = (d2.comments || [])
+                    .filter((c) => c.visibility === 'PUBLIC' && c.state !== 'ARCHIVED')
+                    .map(parseComment)
+                    .sort(byTime);
+                } catch {
+                  /* ignore */
+                }
               })
-              .sort((a, b) => (a.time < b.time ? -1 : 1));
+            );
+            list.sort(byTime);
             return [uid, list];
           } catch {
             return [uid, []];
@@ -197,16 +254,36 @@ async function handleComments(url, req, res) {
       if (!MEMOS_TOKEN) return send(res, 503, { error: 'not_configured' });
       const body = await readJson(req);
       const uid = String(body.uid || '').replace(/[^a-zA-Z0-9_-]/g, '');
-      const name = String(body.name || '').replace(/[\[\]\r\n\t]/g, '').trim().slice(0, 12);
+      const name = String(body.name || '').replace(/[\[\]\(\)\r\n\t]/g, '').trim().slice(0, 12);
+      const link = String(body.url || '').trim();
+      const url2 = /^https?:\/\/\S{1,300}$/i.test(link) ? link : '';
       const text = String(body.text || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, 500);
+      const replyTo = String(body.replyTo || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      const replyName = String(body.replyName || '').replace(/[：:\r\n\t@]/g, '').trim().slice(0, 12);
       if (!uid || !name || !text) return send(res, 400, { error: 'bad_request' });
-      const r = await fetch(`${UPSTREAM}/api/memos/${uid}/comments`, {
+
+      let target = uid;
+      if (replyTo) {
+        const check = await fetch(`${UPSTREAM}/api/memos/${replyTo}`, { headers: { accept: 'application/json' } });
+        const cd = check.ok ? await check.json() : null;
+        const ok =
+          cd &&
+          (cd.relations || []).some(
+            (x) => x.type === 'COMMENT' && x.relatedMemo && x.relatedMemo.name === `memos/${uid}`
+          );
+        if (!ok) return send(res, 400, { error: 'bad_reply_target' });
+        target = replyTo;
+      }
+      const content =
+        `[${name}]${url2 ? `(${url2})` : ''} ` + (replyTo && replyName ? `回复@${replyName}：` : '') + text;
+      const r = await fetch(`${UPSTREAM}/api/memos/${target}/comments`, {
         method: 'POST',
         headers: { authorization: 'Bearer ' + MEMOS_TOKEN, 'content-type': 'application/json' },
-        body: JSON.stringify({ content: `[${name}] ${text}`, visibility: 'PRIVATE' }),
+        body: JSON.stringify({ content, visibility: 'PRIVATE' }),
       });
       if (!r.ok) return send(res, 502, { error: 'memos_rejected' });
-      return send(res, 200, { ok: true, pending: true });
+      const created = await r.json().catch(() => null);
+      return send(res, 200, { ok: true, pending: true, uid: ((created && created.name) || '').split('/')[1] || '' });
     }
     return send(res, 405, { error: 'method_not_allowed' });
   } catch (err) {

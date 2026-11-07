@@ -348,6 +348,9 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* 可点区域严格收窄到昵称文字本身（进详情页），右侧大片空白不可点 */
+  width: fit-content;
+  max-width: 100%;
 }
 
 .moment-text {
@@ -812,6 +815,12 @@ a {
   overflow-wrap: anywhere;
 }
 
+/* 点赞昵称带主页链接：颜色同昵称蓝，新窗口打开 */
+.drawer-likes .names a {
+  color: var(--link);
+  -webkit-touch-callout: none;
+}
+
 .drawer-sep {
   height: 0.5px;
   margin: 0 10px;
@@ -827,10 +836,26 @@ a {
   font-size: 15px;
   line-height: 1.45;
   overflow-wrap: anywhere;
+  /* 点评论 = 回复它（同微信），昵称/链接除外 */
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.comment:active {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="dark"] .comment:active {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .comment .who {
   color: var(--link);
+  -webkit-touch-callout: none;
+}
+
+.comment a.who {
+  text-decoration: none;
 }
 
 .comment .who::after {
@@ -838,11 +863,92 @@ a {
   color: var(--text);
 }
 
+/* 二级回复：「昵称 回复@某某：内容」 */
+.comment.is-reply .who::after {
+  content: " ";
+}
+
+.comment .reply-to {
+  color: var(--text-3);
+}
+
+.comment .reply-to::after {
+  content: "：";
+  color: var(--text);
+}
+
+/* 二级回复缩进（层级最多 2 级） */
+.comment-replies {
+  margin-left: 10px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line);
+}
+
+/* 审核中：仅评论者本人本地可见，灰色 + 徽标 */
+.comment.is-pending {
+  cursor: default;
+  color: var(--text-3);
+}
+
+.comment.is-pending .who,
+.comment.is-pending .reply-to {
+  color: var(--text-3);
+}
+
+.comment.is-pending .c-text a {
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.comment .pending-badge {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+  border: 0.5px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
 /* ------------------------------------------------------------------ 内联评论输入
    微信同款：点「评论」后在动态下方就地展开（非底部弹条） */
 
 .comment-inline {
   margin-top: 8px;
+}
+
+/* 回复条：「回复 某某 ×」，点 × 退回普通评论 */
+.comment-reply-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 0 2px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.comment-reply-txt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-reply-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 50%;
+  background: var(--drawer);
+  color: var(--text-3);
+}
+
+.comment-reply-x:active {
+  opacity: 0.6;
 }
 
 /* 昵称行：已填过也会显示，随时可改（带小铅笔） */
@@ -880,6 +986,29 @@ a {
 .comment-nick-pen {
   flex: 0 0 auto;
   opacity: 0.6;
+}
+
+/* 主页链接行：与昵称行同款，选填 */
+.comment-link-row {
+  margin-top: -2px;
+}
+
+.comment-link {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--drawer);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+}
+
+.comment-link::placeholder {
+  color: var(--text-3);
 }
 
 /* 大输入框（同微信评论框） */
@@ -947,6 +1076,28 @@ a {
   transition: opacity 0.15s ease;
 }
 
+/* 取消：发送旁边，收起输入框（草稿保留） */
+.comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-cancel {
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: 14px;
+}
+
+.comment-cancel:active {
+  opacity: 0.6;
+}
+
 .comment-send:disabled {
   opacity: 0.45;
 }
@@ -960,7 +1111,12 @@ a {
 }
 
 :root[data-theme="dark"] .comment-nick,
+:root[data-theme="dark"] .comment-link,
 :root[data-theme="dark"] .comment-input {
+  background: #333333;
+}
+
+:root[data-theme="dark"] .comment-reply-x {
   background: #333333;
 }
 

@@ -78,6 +78,47 @@ export function setNickname(name) {
   localStorage.setItem('pyq-nick', name);
 }
 
+/** 访客主页链接（选填）：评论和点赞共用，点昵称跳转 */
+export function getHomepage() {
+  return localStorage.getItem('pyq-link') || '';
+}
+
+export function setHomepage(url) {
+  localStorage.setItem('pyq-link', url);
+}
+
+/** 待审评论（本地）：提交后立刻显示「审核中」，过审后自动转正并清除 */
+export function getPendingComments() {
+  try {
+    const arr = JSON.parse(localStorage.getItem('pyq-pending') || '[]');
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function addPendingComment(entry) {
+  const arr = getPendingComments();
+  arr.push(entry);
+  try {
+    localStorage.setItem('pyq-pending', JSON.stringify(arr.slice(-200)));
+  } catch (e) {
+    /* 存储满时静默失败，仅本次会话可见 */
+  }
+}
+
+export function removePendingComments(uids) {
+  if (!uids.length) return;
+  try {
+    localStorage.setItem(
+      'pyq-pending',
+      JSON.stringify(getPendingComments().filter((p) => !uids.includes(p.uid)))
+    );
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 /** 批量拉取一组动态的点赞状态 */
 export async function getLikes(uids) {
   if (!uids.length) return {};
@@ -86,12 +127,12 @@ export async function getLikes(uids) {
   return data.likes || {};
 }
 
-/** 点赞 / 取消点赞，返回最新状态 */
-export async function toggleLike(uid, on, name) {
+/** 点赞 / 取消点赞，返回最新状态；url 为访客主页链接（选填，点昵称跳转） */
+export async function toggleLike(uid, on, name, url) {
   const res = await fetch(BASE + '/likes', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ uid, visitor: visitorId(), name: name || '访客', on: !!on }),
+    body: JSON.stringify({ uid, visitor: visitorId(), name: name || '访客', url: url || '', on: !!on }),
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
@@ -105,12 +146,23 @@ export async function getComments(uids) {
   return data.comments || {};
 }
 
-/** 提交评论（先审后发：提交后为待审状态，Memos 里改公开即上架） */
-export async function postComment(uid, name, text) {
+/**
+ * 提交评论（先审后发：提交后为待审状态，Memos 里改公开即上架）
+ * reply: { attachUid, replyName } —— 回复某条评论时：挂到一级评论下，replyName 用于展示
+ * 返回 { uid } 供本地「审核中」显示与过审匹配
+ */
+export async function postComment(uid, name, url, text, reply) {
   const res = await fetch(BASE + '/comments', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ uid, name, text }),
+    body: JSON.stringify({
+      uid,
+      name,
+      url: url || '',
+      text,
+      replyTo: reply?.attachUid || '',
+      replyName: reply?.replyName || '',
+    }),
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();

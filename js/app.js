@@ -9,6 +9,11 @@ import {
   postComment,
   getNickname,
   setNickname,
+  getHomepage,
+  setHomepage,
+  getPendingComments,
+  addPendingComment,
+  removePendingComments,
   PLACEHOLDER_AVATAR,
 } from './api.js';
 import { renderMoment, imagesOf, drawerHtml } from './render.js';
@@ -317,7 +322,7 @@ function bindMoment(node, opts = {}) {
         const liked = engaged.get(uid)?.likes?.liked || false;
         btn.disabled = true;
         try {
-          const r = await toggleLike(uid, !liked, getNickname() || '访客');
+          const r = await toggleLike(uid, !liked, getNickname() || '访客', getHomepage());
           const item = engaged.get(uid) || { comments: [] };
           item.likes = { count: r.count, names: r.names, liked: r.liked };
           engaged.set(uid, item);
@@ -334,12 +339,33 @@ function bindMoment(node, opts = {}) {
     });
   }
 
-  // 点灰底框也可以直接评论（同微信点评论区回复）
+  // 点灰底框：点赞行/空白 = 直接评论；点某条评论 = 回复它（同微信）
   const drawer = node.querySelector('.drawer');
   if (drawer) {
-    drawer.addEventListener('click', () => {
+    drawer.addEventListener('click', (e) => {
+      if (e.target.closest('a')) return; // 点昵称/链接是跳转，不是回复
       const uid = (node.dataset.name || '').split('/')[1];
-      if (uid) openInlineComment(node, uid);
+      if (!uid) return;
+      const row = e.target.closest('.comment');
+      if (!row) {
+        openInlineComment(node, uid);
+        return;
+      }
+      if (row.classList.contains('is-pending')) {
+        toast('这条还在审核中，暂时不能回复');
+        return;
+      }
+      // 二级评论：挂回它所属的一级评论下（层级最多 2 级）
+      let top = row;
+      if (row.classList.contains('is-reply')) {
+        const wrap = row.closest('.comment-replies') || row.parentElement;
+        top = (wrap && wrap.closest('.comment')) || row;
+      }
+      openInlineComment(node, uid, {
+        attachUid: top.dataset.cuid || '',
+        replyName: row.dataset.cname || '',
+        chipName: row.dataset.cname || '',
+      });
     });
   }
 
@@ -389,40 +415,90 @@ function paintDrawer(node) {
   const data = engaged.get(uid);
   const drawer = node.querySelector('.drawer');
   if (!drawer || !data) return;
-  drawer.innerHTML = drawerHtml(data.likes, data.comments);
+  drawer.innerHTML = drawerHtml(data.likes, withPending(uid, data.comments));
 }
 
-/** 发送成功后单独刷新某条动态的评论（过审后 ~30s 内可见） */
-async function refreshComments(uid) {
-  try {
-    const comments = await getComments([uid]);
-    const item = engaged.get(uid) || { likes: { count: 0, names: [], liked: false } };
-    item.comments = comments[uid] || [];
-    engaged.set(uid, item);
-    const node = el.feed.querySelector(`[data-name="memos/${uid}"]`);
-    if (node) paintDrawer(node);
-  } catch (err) {
-    console.warn('[comments]', err);
+/**
+ * 待审评论合并渲染：
+ *  - 提交后立即以灰色「审核中」显示（只有评论者自己的浏览器可见）
+ *  - 每次拉取时比对：API 里出现同 uid（或同昵称+内容）= 已过审 → 清掉本地记录
+ *  - 待审的回复挂到对应一级评论下；父级还在待审就先挂在它下面
+ */
+function withPending(uid, comments) {
+  const pend = getPendingComments().filter((p) => p.memoUid === uid);
+  if (!pend.length) return comments;
+
+  const approvedUids = new Set();
+  const approvedKeys = new Set();
+  const walk = (arr) =>
+    (arr || []).forEach((c) => {
+      if (c.uid) approvedUids.add(c.uid);
+      approvedKeys.add(c.name + '\u0000' + c.text);
+      if (c.replies) walk(c.replies);
+    });
+  walk(comments);
+
+  const still = pend.filter(
+    (p) => !(p.uid && approvedUids.has(p.uid)) && !approvedKeys.has(p.name + '\u0000' + p.text)
+  );
+  const done = pend.filter((p) => !still.includes(p));
+  if (done.length) removePendingComments(done.map((p) => p.uid).filter(Boolean));
+  if (!still.length) return comments;
+
+  const out = (comments || []).map((c) => ({ ...c, replies: (c.replies || []).map((r) => ({ ...r })) }));
+  const pendingTopMap = new Map(); // attachUid -> 待审一级评论对象
+  for (const p of still) {
+    const item = {
+      uid: p.uid,
+      name: p.name,
+      url: p.url,
+      text: p.text,
+      replyName: p.replyName,
+      pending: true,
+      replies: [],
+    };
+    if (!p.attachUid) {
+      out.push(item);
+      pendingTopMap.set(p.uid, item);
+    } else {
+      const top = out.find((c) => c.uid === p.attachUid) || pendingTopMap.get(p.attachUid);
+      if (top) top.replies.push(item);
+      else out.push(item); // 父评论不存在了（被删），降级成一级显示
+    }
   }
+  return out;
 }
 
 /* --------------------------------------------------------------- 内联评论输入
    微信同款：点「评论」后输入框在【那条动态下方】就地展开，不是底部弹条 */
 
 let commentNode = null; // 当前展开输入框的 .moment 节点
+let replyCtx = null; // 回复上下文 { attachUid, replyName, chipName }，空 = 普通评论
 
-function openInlineComment(node, uid) {
+function openInlineComment(node, uid, reply) {
   if (commentNode && commentNode !== node) closeInlineComment();
   const box = node.querySelector('.comment-inline');
   if (!box) return;
   commentNode = node;
+  replyCtx = reply || null;
   const nick = box.querySelector('.comment-nick');
+  const link = box.querySelector('.comment-link');
   const input = box.querySelector('.comment-input');
   const send = box.querySelector('.comment-send');
-  // 昵称行常显：填过就直接带出，随时可以改名
+  const bar = box.querySelector('.comment-reply-bar');
+  // 昵称/主页行常显：填过就直接带出，随时可以改
   nick.value = getNickname();
-  input.value = '';
-  send.disabled = true;
+  link.value = getHomepage();
+  if (replyCtx) {
+    box.querySelector('.comment-reply-txt').textContent = '回复 ' + replyCtx.chipName;
+    bar.hidden = false;
+    input.placeholder = '回复 ' + replyCtx.chipName + '…';
+  } else {
+    bar.hidden = true;
+    input.placeholder = '评论';
+  }
+  // 草稿保留：输入过的文字不清空（发送成功才清），取消只是收起
+  send.disabled = input.value.trim().length === 0;
   box.hidden = false;
   // 移动端需要用户手势内 focus 才能唤起键盘，这里在同一次点击里聚焦
   input.focus();
@@ -435,19 +511,37 @@ function closeInlineComment() {
   const box = commentNode.querySelector('.comment-inline');
   if (box) box.hidden = true;
   commentNode = null;
+  replyCtx = null;
+}
+
+/** 回复条上的 ×：退出回复模式，回到普通评论（已输入文字保留） */
+function clearReplyCtx() {
+  replyCtx = null;
+  if (!commentNode) return;
+  const box = commentNode.querySelector('.comment-inline');
+  if (!box) return;
+  box.querySelector('.comment-reply-bar').hidden = true;
+  box.querySelector('.comment-input').placeholder = '评论';
 }
 
 async function sendComment(node, uid) {
   const box = node.querySelector('.comment-inline');
   if (!box) return;
   const nick = box.querySelector('.comment-nick');
+  const link = box.querySelector('.comment-link');
   const input = box.querySelector('.comment-input');
   const send = box.querySelector('.comment-send');
   const name = nick.value.trim();
+  const url = link.value.trim();
   const text = input.value.trim();
   if (!name) {
     toast('先给自己起个昵称吧');
     nick.focus();
+    return;
+  }
+  if (url && !/^https?:\/\//i.test(url)) {
+    toast('主页链接要以 http:// 或 https:// 开头');
+    link.focus();
     return;
   }
   if (!text) {
@@ -458,10 +552,24 @@ async function sendComment(node, uid) {
   send.disabled = true;
   try {
     setNickname(name);
-    await postComment(uid, name, text);
+    setHomepage(url);
+    const ctx = replyCtx;
+    const r = await postComment(uid, name, url, text, ctx);
+    // 本地记一条「审核中」，自己可见；过审后拉到同 uid 自动转正
+    addPendingComment({
+      memoUid: uid,
+      uid: r.uid || '',
+      name,
+      url,
+      text,
+      replyName: ctx?.replyName || '',
+      attachUid: ctx?.attachUid || '',
+      ts: Date.now(),
+    });
+    input.value = ''; // 发送成功才清草稿
     closeInlineComment();
-    toast('已提交，审核通过后会显示');
-    refreshComments(uid);
+    paintDrawer(node); // 立刻以「审核中」样式显示
+    toast('已提交，过审后公开显示');
   } catch (err) {
     console.warn('[comment]', err);
     toast('发送失败，稍后再试');
@@ -477,6 +585,10 @@ function bindCommentInline(node) {
   const input = box.querySelector('.comment-input');
   const send = box.querySelector('.comment-send');
   send.addEventListener('click', () => sendComment(node, uid()));
+  // 「取消」：收起输入框，草稿保留（下次点开还在）
+  box.querySelector('.comment-cancel').addEventListener('click', closeInlineComment);
+  // 回复条上的 ×：退出回复模式
+  box.querySelector('.comment-reply-x').addEventListener('click', clearReplyCtx);
   // 有字才亮「发送」（同微信）
   input.addEventListener('input', () => {
     send.disabled = input.value.trim().length === 0;
@@ -488,6 +600,12 @@ function bindCommentInline(node) {
     }
   });
   box.querySelector('.comment-nick').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      box.querySelector('.comment-link').focus();
+    }
+  });
+  box.querySelector('.comment-link').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       input.focus();
