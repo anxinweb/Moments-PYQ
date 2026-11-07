@@ -302,6 +302,7 @@ function paintViewer() {
 
 function applyViewerTransform() {
   el.viewerImg.classList.toggle('is-zoom', viewer.zoom);
+  el.viewer.classList.toggle('is-zoom', viewer.zoom);
   el.viewerImg.style.transform = viewer.zoom
     ? `translate(${viewer.panX}px, ${viewer.panY}px) scale(2)`
     : '';
@@ -349,6 +350,8 @@ function initViewer() {
   let moved = false;
 
   el.viewerStage.addEventListener('pointerdown', (e) => {
+    // 箭头按钮不参与拖拽/缩放手势，否则 pointer capture 会吞掉点击
+    if (e.target.closest('.viewer-arrow')) return;
     tracking = true;
     moved = false;
     startX = e.clientX;
