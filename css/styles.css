@@ -539,6 +539,12 @@ a {
 .audio-bars {
   display: block;
   width: 100%;
+  padding: 5px 0; /* 扩大点击热区，进度条可点按跳转 */
+  cursor: pointer;
+}
+
+.audio-track {
+  display: block;
   height: 3px;
   border-radius: 2px;
   background: var(--line);
@@ -869,6 +875,16 @@ a {
 
 .viewer.is-open {
   display: block;
+  animation: viewer-fade 0.18s ease;
+}
+
+@keyframes viewer-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .viewer-stage {

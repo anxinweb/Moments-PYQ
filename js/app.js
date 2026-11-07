@@ -193,8 +193,20 @@ function bindAudio(card) {
   const audio = card.querySelector('audio');
   const btn = card.querySelector('.audio-play');
   const fill = card.querySelector('.audio-fill');
+  const bars = card.querySelector('.audio-bars');
   const label = card.querySelector('.audio-time');
   if (!audio || !btn) return;
+
+  // 点进度条跳转播放位置
+  if (bars) {
+    bars.addEventListener('click', (e) => {
+      if (!isFinite(audio.duration) || audio.duration <= 0) return;
+      const r = bars.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      audio.currentTime = ratio * audio.duration;
+      if (audio.paused) audio.play().catch(() => {});
+    });
+  }
 
   const paint = () => {
     const dur = isFinite(audio.duration) ? audio.duration : 0;
@@ -396,6 +408,7 @@ const ZOOM_STEP = 2.6;
 
 let tapAt = 0;
 let tapTimer = 0;
+let lastReset = 0; // 轻点/双击还原缩放的时刻，其后一瞬间内的轻点不再参与判定
 
 // 原图预加载缓存：url -> HTMLImageElement（浏览器 HTTP 缓存之外再保一层，切图零等待）
 const originCache = new Map();
@@ -669,7 +682,7 @@ function initViewer() {
       applyViewerTransform();
     }
 
-    // 放大状态：拖到边界继续拖 → 切图（同微信）；轻点还原原始大小
+    // 放大状态：拖到边界继续拖 → 切图（同微信）；轻点/双击还原原始大小
     if (viewer.scale > 1.01) {
       if (Math.abs(edgeX) > 70 && Math.abs(edgeX) > Math.abs(dy)) {
         const dir = edgeX > 0 ? -1 : 1;
@@ -678,7 +691,13 @@ function initViewer() {
         return;
       }
       edgeX = 0;
-      if (!wasPinch && isTap && quick) zoomTo(1);
+      // 触屏：轻点还原原始大小（双击放小的第一下）；桌面端交给 dblclick 切换
+      if (!wasPinch && isTap && quick && e.pointerType === 'touch') {
+        lastReset = performance.now();
+        tapAt = 0;
+        clearTimeout(tapTimer);
+        zoomTo(1);
+      }
       return;
     }
 
@@ -708,6 +727,8 @@ function initViewer() {
 
     // 轻点：双击（两次 300ms 内）放大，单击延时关闭，避免双击被单击抢掉
     const now = performance.now();
+    // 刚还原过缩放：紧接着的那次轻点（双击放小的第二下）不再触发放大或关闭
+    if (now - lastReset < 400) return;
     if (tapAt && now - tapAt < 300) {
       tapAt = 0;
       clearTimeout(tapTimer);

@@ -34,10 +34,26 @@ export function renderContent(raw, opts = {}) {
   const hideTags = opts.hideTags !== false;
   let t = String(raw || '');
 
+  // 图片语法交给九宫格附件展示，正文里不再出现
   t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
-  t = t.replace(/^#{1,6}\s+/gm, '');
-  if (hideTags) t = t.replace(/(^|\s)#([^\s#]+)/g, '$1');
-  t = t.replace(/^\s*([-—–_*]\s*){2,}$/gm, '');
+  // 标题降级为普通文本
+  t = t.replace(/^[ \t]*#{1,6}[ \t]+/gm, '');
+  // 任务列表 → 勾选符号
+  t = t.replace(/^[ \t]*[-*+][ \t]+\[[xX]\][ \t]*/gm, '☑ ');
+  t = t.replace(/^[ \t]*[-*+][ \t]+\[ \][ \t]*/gm, '☐ ');
+  // 无序列表 → 圆点（保留原来的行结构）
+  t = t.replace(/^[ \t]*[-*+][ \t]+/gm, '· ');
+  // 引用前缀
+  t = t.replace(/^[ \t]*>[ \t]?/gm, '');
+  if (hideTags) t = t.replace(/(^|\s)#[^\s#]+/g, '$1');
+  // 水平分割线（朋友圈没有这个概念）
+  t = t.replace(/^[ \t]*([-—–_*][ \t]*){2,}$/gm, '');
+  // 语法删除后残留的空格 / 空行 / 空列表行
+  t = t.replace(/^[ \t]*·[ \t]*$/gm, '');
+  t = t.replace(/[ \t]{2,}/g, ' ');
+  t = t.replace(/[ \t]+$/gm, '');
+  t = t.replace(/\n{3,}/g, '\n\n');
+
   t = escapeHtml(t);
   t = t.replace(/```([\s\S]*?)```/g, (_, code) => '<code>' + code.trim() + '</code>');
   t = t.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -134,7 +150,7 @@ function audioHtml(a) {
     `</button>` +
     `<span class="audio-main">` +
     `<span class="audio-name" title="${escapeHtml(a.name)}">${escapeHtml(a.name || '音频')}</span>` +
-    `<span class="audio-bars"><span class="audio-fill"></span></span>` +
+    `<span class="audio-bars"><span class="audio-track"><span class="audio-fill"></span></span></span>` +
     `</span>` +
     `<span class="audio-time">0:00</span>` +
     `<audio src="${a.url}" preload="metadata"></audio>` +
