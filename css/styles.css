@@ -139,11 +139,27 @@ a {
   height: 40px;
   border-radius: 50%;
   color: inherit;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, transform 0.12s ease;
+}
+
+.nav-btn svg {
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.18));
+}
+
+.nav.is-solid .nav-btn svg {
+  filter: none;
+}
+
+@media (hover: hover) {
+  .nav-btn:hover {
+    background: rgba(127, 127, 127, 0.16);
+  }
 }
 
 .nav-btn:active {
-  background: rgba(127, 127, 127, 0.18);
+  background: rgba(127, 127, 127, 0.22);
+  transform: scale(0.93);
 }
 
 .nav.is-solid {
@@ -158,15 +174,15 @@ a {
   text-shadow: none;
 }
 
-.icon-moon {
+.nav-btn .icon-moon {
   display: none;
 }
 
-:root[data-theme="dark"] .icon-sun {
+:root[data-theme="dark"] .nav-btn .icon-sun {
   display: none;
 }
 
-:root[data-theme="dark"] .icon-moon {
+:root[data-theme="dark"] .nav-btn .icon-moon {
   display: block;
 }
 
@@ -685,17 +701,22 @@ a {
   max-height: 100%;
   object-fit: contain;
   pointer-events: auto;
-  transition: opacity 0.2s ease, transform 0.15s ease;
+  transform-origin: center center;
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   user-select: none;
   -webkit-user-drag: none;
   will-change: transform;
+  -webkit-user-select: none;
 }
 
+/* 放大态：保持适配后的显示尺寸，只用 transform 放大，避免变成原始像素尺寸撑破屏幕 */
 .viewer-img.is-zoom {
-  transition: none;
   cursor: grab;
-  max-width: none;
-  max-height: none;
+}
+
+.viewer-img.is-panning {
+  transition: none;
+  cursor: grabbing;
 }
 
 .viewer-close {

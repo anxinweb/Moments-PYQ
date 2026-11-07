@@ -29,7 +29,7 @@ export default async function handler(request) {
       status: res.ok ? 200 : res.status,
       headers: {
         'content-type': 'application/json; charset=utf-8',
-        'cache-control': 'public, s-maxage=30, stale-while-revalidate=300',
+        'cache-control': 'public, s-maxage=60, stale-while-revalidate=600',
         'access-control-allow-origin': '*',
       },
     });
