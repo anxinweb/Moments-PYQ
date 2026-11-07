@@ -267,21 +267,22 @@ function bindMoment(node, opts = {}) {
     });
   });
 
-  // 头像 → 资料页（同微信点头像进个人名片）
+  // 头像 → 单条详情（微信点头像进详情；封面头像才进资料页）
   node.querySelectorAll('.moment-avatar').forEach((img) => {
     img.classList.add('is-link');
     img.addEventListener('click', () => {
-      location.href = '/?about=1';
+      const uid = (node.dataset.name || '').split('/')[1];
+      if (uid) location.href = '/?memo=' + uid;
     });
   });
 
-  // 列表页：点正文任意处进单条详情（微信行为）；详情页内不重复跳转
+  // 列表页：仅昵称可点进单条详情（正文/评论区/媒体均不可点，避免误触）
   if (opts.linkDetail !== false) {
-    const body = node.querySelector('.moment-body');
+    const nameEl = node.querySelector('.moment-name');
     const uid = (node.dataset.name || '').split('/')[1];
-    if (body && uid) {
-      body.addEventListener('click', (e) => {
-        if (e.target.closest('a, button, .cell, .media, .grid, .fold-btn, .popover, .drawer')) return;
+    if (nameEl && uid) {
+      nameEl.classList.add('is-link');
+      nameEl.addEventListener('click', () => {
         location.href = '/?memo=' + uid;
       });
     }
@@ -361,7 +362,7 @@ function closePopover() {
 /** uid -> { likes: {count, names, liked}, comments: [{name, text, time}] } */
 const engaged = new Map();
 
-/** 渲染一组动态后拉取它们的点赞/评论（失败静默，不影响正文） */
+/** 渲染一组动态后拉取它们的点赞/评论（失败静默，不影响正文）；管理员模式下附带待审列表 */
 async function loadEngagement(nodes) {
   const uids = nodes
     .map((n) => (n.dataset.name || '').split('/')[1])
