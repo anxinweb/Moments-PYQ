@@ -102,8 +102,36 @@ a {
   }
 }
 
-/* ------------------------------------------------------------------ 导航 */
+/* iOS 26+ 独立窗口（添加到主屏幕）下，系统会在顶/底边缘自动绘制 Liquid Glass
+   毛玻璃带。WebKit 的规则：只要顶缘检测到一个覆盖边缘的纯色 fixed 元素，就不再
+   绘制。这两个空 div 只在 PWA 环境显示，浏览器里 display:none 完全无感 */
+.edge-fix {
+  display: none;
+}
 
+@media (display-mode: standalone) {
+  .edge-fix {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    background: var(--bg-page);
+  }
+
+  .edge-fix-top {
+    top: 0;
+    height: calc(env(safe-area-inset-top, 0px) + 1px);
+    z-index: 31; /* 盖过导航(30)，低于查看器(100) */
+  }
+
+  .edge-fix-bottom {
+    bottom: 0;
+    height: calc(env(safe-area-inset-bottom, 0px) + 1px);
+    z-index: 31;
+  }
+}
+
+/* ------------------------------------------------------------------ 导航 */
 .nav {
   position: fixed;
   top: 0;
