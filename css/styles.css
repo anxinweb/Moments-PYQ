@@ -381,7 +381,7 @@ a {
 .fold-btn {
   display: block;
   margin-top: 4px;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--link);
 }
 
@@ -409,19 +409,6 @@ a {
 .grid[data-count="4"] {
   width: 66.6%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-/* 手机端 2/4 图：同九宫格格子宽，自然比例（竖图完整显示，超高才裁），同微信 */
-.grid[data-count="2"] .cell,
-.grid[data-count="4"] .cell {
-  aspect-ratio: auto;
-  min-height: 44px;
-}
-
-.grid[data-count="2"] .cell img,
-.grid[data-count="4"] .cell img {
-  height: auto;
-  max-height: 156px;
 }
 
 .grid[data-count="3"],
@@ -491,7 +478,7 @@ a {
 
 .media-video video {
   display: block;
-  max-width: 100%;
+  max-width: min(100%, 250px);
   max-height: 62vh;
   border-radius: 4px;
   background: #000;
@@ -1368,17 +1355,8 @@ a {
     max-width: 282px;
   }
 
-  /* 桌面端 2/4 图恢复方形裁切（同微信电脑版） */
-  .grid[data-count="2"] .cell,
-  .grid[data-count="4"] .cell {
-    aspect-ratio: 1 / 1;
-    min-height: 0;
-  }
-
-  .grid[data-count="2"] .cell img,
-  .grid[data-count="4"] .cell img {
-    height: 100%;
-    max-height: none;
+  .media-video video {
+    max-width: 320px;
   }
 
   .grid[data-count="1"] {
