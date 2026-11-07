@@ -411,6 +411,19 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* 手机端 2/4 图：同九宫格格子宽，自然比例（竖图完整显示，超高才裁），同微信 */
+.grid[data-count="2"] .cell,
+.grid[data-count="4"] .cell {
+  aspect-ratio: auto;
+  min-height: 44px;
+}
+
+.grid[data-count="2"] .cell img,
+.grid[data-count="4"] .cell img {
+  height: auto;
+  max-height: 156px;
+}
+
 .grid[data-count="3"],
 .grid[data-count="5"],
 .grid[data-count="6"],
@@ -646,12 +659,12 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  width: 32px;
+  gap: 4px;
+  width: 34px;
   height: 20px;
   border-radius: 4px;
   background: var(--drawer);
-  color: var(--link);
+  color: var(--text-3);
 }
 
 .more-btn i {
@@ -1290,33 +1303,46 @@ a {
   }
 
   .moment {
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(0, 1fr);
     column-gap: 14px;
     padding: 0 70px 24px;
   }
 
   .moment + .moment {
+    border-top: 0;
     padding-top: 24px;
+    position: relative;
+  }
+
+  /* 桌面分隔线两端内缩（同微信电脑版），手机端保持通栏 */
+  .moment + .moment::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 70px;
+    right: 70px;
+    height: 0.5px;
+    background: var(--line);
   }
 
   .skeleton {
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: 42px minmax(0, 1fr);
     column-gap: 14px;
     padding: 0 70px 22px;
   }
 
   .moment-avatar {
-    width: 48px;
-    height: 48px;
+    width: 42px;
+    height: 42px;
     border-radius: 5px;
   }
 
   .moment-name {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .moment-text {
-    font-size: 17px;
+    font-size: 16px;
   }
 
   .fold-btn {
@@ -1327,22 +1353,36 @@ a {
     gap: 5px;
   }
 
+  /* 对标微信电脑版：6 图总宽约面板 52%、2 图约 44%，格子明显小于手机端 */
   .grid[data-count="3"],
   .grid[data-count="5"],
   .grid[data-count="6"],
   .grid[data-count="7"],
   .grid[data-count="8"],
   .grid[data-count="9"] {
-    max-width: 460px;
+    max-width: 336px;
   }
 
   .grid[data-count="2"],
   .grid[data-count="4"] {
-    max-width: 320px;
+    max-width: 282px;
+  }
+
+  /* 桌面端 2/4 图恢复方形裁切（同微信电脑版） */
+  .grid[data-count="2"] .cell,
+  .grid[data-count="4"] .cell {
+    aspect-ratio: 1 / 1;
+    min-height: 0;
+  }
+
+  .grid[data-count="2"] .cell img,
+  .grid[data-count="4"] .cell img {
+    height: 100%;
+    max-height: none;
   }
 
   .grid[data-count="1"] {
-    max-width: 300px;
+    max-width: 280px;
   }
 
   .grid[data-count="1"] .cell img {

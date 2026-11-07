@@ -250,7 +250,7 @@ export function renderMoment(memo, profile, opts = {}) {
     media.files.map(fileHtml).join('') +
     `<div class="meta">` +
     `<time datetime="${memo.createTime}">${timeText(memo.createTime)}</time>` +
-    `<button class="more-btn" data-more="${escapeHtml(memo.name)}" aria-label="赞和评论"><i></i><i></i><i></i></button>` +
+    `<button class="more-btn" data-more="${escapeHtml(memo.name)}" aria-label="赞和评论"><i></i><i></i></button>` +
     popoverHtml() +
     `</div>` +
     `<div class="drawer" data-drawer="${escapeHtml(memo.name)}"></div>` +
