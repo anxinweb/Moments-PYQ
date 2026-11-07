@@ -260,7 +260,7 @@ function bindMoment(node, opts = {}) {
   node.querySelectorAll('.moment-avatar').forEach((img) => {
     img.classList.add('is-link');
     img.addEventListener('click', () => {
-      location.href = '/about';
+      location.href = '/?about=1';
     });
   });
 
@@ -271,7 +271,7 @@ function bindMoment(node, opts = {}) {
     if (body && uid) {
       body.addEventListener('click', (e) => {
         if (e.target.closest('a, button, .cell, .media, .grid, .fold-btn, .popover')) return;
-        location.href = '/memo/' + uid;
+        location.href = '/?memo=' + uid;
       });
     }
   }
@@ -954,12 +954,21 @@ function initViewer() {
 
 /* --------------------------------------------------------------- 路由与子页面 */
 
-/** /memo/<uid> → 单条详情；/about → 资料页；其余为信息流 */
+/**
+ * 路由：
+ *   /memo/<uid> 或 /?memo=<uid> → 单条详情（查询参数版不依赖服务器 rewrite，分享链接用它）
+ *   /about 或 /?about=1 → 资料页
+ *   其余为信息流（?page=N 翻页）
+ */
 function parseRoute() {
-  const p = location.pathname;
-  const m = p.match(/^\/memo\/([A-Za-z0-9_-]+)\/?$/);
-  if (m) return { view: 'memo', uid: m[1] };
-  if (/^\/about\/?$/.test(p)) return { view: 'about' };
+  const qs = new URLSearchParams(location.search);
+  const pathUid = location.pathname.match(/^\/memo\/([A-Za-z0-9_-]+)\/?$/);
+  if (pathUid) return { view: 'memo', uid: pathUid[1] };
+  if (/^\/about\/?$/.test(location.pathname) || qs.get('about') === '1') {
+    return { view: 'about' };
+  }
+  const qUid = (qs.get('memo') || '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (qUid) return { view: 'memo', uid: qUid };
   return { view: 'feed' };
 }
 
@@ -1005,7 +1014,7 @@ async function loadDetailView(uid) {
 /** 详情页右上角：系统分享面板优先，没有就复制链接 */
 function bindShare(memo) {
   const uid = (memo.name || '').split('/')[1];
-  const url = location.origin + '/memo/' + uid;
+  const url = location.origin + '/?memo=' + uid;
   const text = (memo.content || '').replace(/\s+/g, ' ').trim().slice(0, 60);
   el.shareBtn.addEventListener('click', async () => {
     if (navigator.share) {
@@ -1144,7 +1153,7 @@ async function boot() {
   // 封面头像 → 资料页（同微信点头像看个人主页）
   el.coverAvatar.classList.add('is-link');
   el.coverAvatar.addEventListener('click', () => {
-    location.href = '/about';
+    location.href = '/?about=1';
   });
 
   // 赞/评论浮层：点空白处、滚动页面、按 Esc 都收起（同微信）
