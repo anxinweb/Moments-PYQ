@@ -165,8 +165,11 @@ function bindMoment(node) {
   node.querySelectorAll('.cell').forEach((cell) => {
     cell.addEventListener('click', () => {
       const grid = cell.closest('.grid');
-      const origins = Array.from(grid.querySelectorAll('img')).map((i) => i.dataset.origin || i.src);
-      openViewer(origins, Number(cell.dataset.index) || 0);
+      const list = Array.from(grid.querySelectorAll('img')).map((i) => ({
+        thumb: i.currentSrc || i.src,
+        origin: i.dataset.origin || i.src,
+      }));
+      openViewer(list, Number(cell.dataset.index) || 0);
     });
   });
   const moreBtn = node.querySelector('.more-btn');
@@ -275,7 +278,32 @@ function trimToPage(page) {
 
 /* --------------------------------------------------------------- 大图查看 */
 
-const viewer = { list: [], index: 0, open: false, zoom: false, panX: 0, panY: 0 };
+const viewer = { list: [], index: 0, open: false, zoom: false, panX: 0, panY: 0, token: 0 };
+
+// 原图预加载缓存：url -> HTMLImageElement（浏览器 HTTP 缓存之外再保一层，切图零等待）
+const originCache = new Map();
+
+function preloadOrigin(url) {
+  if (!url) return null;
+  let img = originCache.get(url);
+  if (!img) {
+    img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    originCache.set(url, img);
+  }
+  return img;
+}
+
+/** 预取前后各两张，滑动时基本都是秒出 */
+function preloadAround() {
+  const total = viewer.list.length;
+  if (total < 2) return;
+  [1, -1, 2, -2].forEach((d) => {
+    const item = viewer.list[(viewer.index + d + total) % total];
+    if (item) preloadOrigin(item.origin);
+  });
+}
 
 function openViewer(list, index) {
   if (!list.length) return;
@@ -293,11 +321,29 @@ function openViewer(list, index) {
 
 function paintViewer() {
   const total = viewer.list.length;
-  el.viewerImg.src = viewer.list[viewer.index];
+  const item = viewer.list[viewer.index];
+  if (!item) return;
+
+  viewer.token += 1;
+  const token = viewer.token;
+
+  // 先用已缓存的缩略图立即上屏，切换不会有空白等待
+  el.viewerImg.src = item.thumb || item.origin;
   el.viewerCount.textContent = total > 1 ? `${viewer.index + 1} / ${total}` : '';
   el.viewerPrev.hidden = total < 2;
   el.viewerNext.hidden = total < 2;
   applyViewerTransform();
+
+  // 原图解码完成后无缝替换为高清版本
+  const pre = preloadOrigin(item.origin);
+  const swap = () => {
+    if (token !== viewer.token || !viewer.open) return;
+    el.viewerImg.src = item.origin;
+  };
+  if (pre.complete && pre.naturalWidth > 0) swap();
+  else pre.addEventListener('load', swap, { once: true });
+
+  preloadAround();
 }
 
 function applyViewerTransform() {
@@ -320,6 +366,7 @@ function stepViewer(delta) {
 
 function closeViewer() {
   viewer.open = false;
+  viewer.token += 1; // 取消尚未完成的原图替换
   el.viewer.classList.remove('is-open');
   el.viewer.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
@@ -432,9 +479,6 @@ function onScroll() {
     const coverH = el.coverImg ? el.cover.offsetHeight : 0;
     el.nav.classList.toggle('is-solid', y > coverH - 44);
     el.topBtn.classList.toggle('is-show', y > 1200);
-    if (el.coverImg && y >= 0 && y <= coverH + 80) {
-      el.coverImg.style.transform = `translate3d(0, ${y * 0.35}px, 0) scale(1.02)`;
-    }
   });
 }
 

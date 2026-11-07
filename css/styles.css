@@ -185,8 +185,6 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform-origin: center top;
-  will-change: transform;
   opacity: 0;
   transition: opacity 0.5s ease;
 }
@@ -617,7 +615,8 @@ a {
 
 .top-btn {
   position: fixed;
-  right: max(18px, calc(50% - var(--app-w) / 2 + 18px));
+  /* 桌面端贴在内容列右侧的留白里（按钮宽 38 + 间距 60）；手机端无留白，回到 18px */
+  right: max(18px, calc(50% - var(--app-w) / 2 - 98px));
   bottom: 28px;
   width: 38px;
   height: 38px;
