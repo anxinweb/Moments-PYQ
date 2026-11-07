@@ -221,7 +221,7 @@ function popoverHtml() {
     `<div class="popover" data-pop hidden>` +
     `<button class="pop-btn" type="button" data-act="like">` +
     `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.6 4.7 13.3a4.9 4.9 0 0 1 0-6.9 4.7 4.7 0 0 1 6.6 0l.7.8.7-.8a4.7 4.7 0 0 1 6.6 0 4.9 4.9 0 0 1 0 6.9z"/></svg>` +
-    `赞</button>` +
+    `<span class="pop-txt">赞</span></button>` +
     `<span class="pop-sep" aria-hidden="true"></span>` +
     `<button class="pop-btn" type="button" data-act="comment">` +
     `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.2A3.2 3.2 0 0 1 7.2 3h9.6A3.2 3.2 0 0 1 20 6.2v6.4a3.2 3.2 0 0 1-3.2 3.2H9.9l-3.6 3.2a.7.7 0 0 1-1.2-.5z"/></svg>` +
@@ -259,8 +259,32 @@ export function renderMoment(memo, profile, opts = {}) {
   );
 }
 
-export function skeletonHtml(n) {
+/** 微信样式的赞/评论灰底框：♥ 昵称们 + 每条评论「昵称：内容」 */
+export function drawerHtml(likes, comments) {
+  const hasLikes = likes && likes.count > 0;
+  const list = comments || [];
+  if (!hasLikes && !list.length) return '';
+
   let out = '';
+  if (hasLikes) {
+    out +=
+      `<div class="drawer-likes">` +
+      `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 20.6 4.7 13.3a4.9 4.9 0 0 1 0-6.9 4.7 4.7 0 0 1 6.6 0l.7.8.7-.8a4.7 4.7 0 0 1 6.6 0 4.9 4.9 0 0 1 0 6.9z"/></svg>` +
+      `<span class="names">${(likes.names || []).map((n) => escapeHtml(n)).join('、')}</span>` +
+      `</div>`;
+  }
+  if (list.length) {
+    if (hasLikes) out += `<div class="drawer-sep"></div>`;
+    out += `<div class="drawer-comments">`;
+    for (const c of list) {
+      out += `<div class="comment"><span class="who">${escapeHtml(c.name)}</span>${escapeHtml(c.text)}</div>`;
+    }
+    out += `</div>`;
+  }
+  return out;
+}
+
+export function skeletonHtml(n) {  let out = '';
   for (let i = 0; i < n; i++) {
     out +=
       `<div class="skeleton">` +

@@ -18,7 +18,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" href="/assets/pyqlogo.png">
 <link rel="apple-touch-icon" href="/assets/pyqlogo.png">
-<link rel="stylesheet" href="/css/styles.css?v=20261108o">
+<link rel="stylesheet" href="/css/styles.css?v=20261108p">
 <script>
 (function () {
   try {
@@ -137,8 +137,13 @@
   <div class="viewer-count" id="viewerCount"></div>
 </div>
 
+<div class="comment-bar" id="commentBar" hidden>
+  <input class="comment-nick" id="commentNick" placeholder="昵称" maxlength="12" autocomplete="nickname" enterkeyhint="next">
+  <input class="comment-input" id="commentInput" placeholder="评论" maxlength="500" enterkeyhint="send">
+  <button class="comment-send" id="commentSend" type="button">发送</button>
+</div>
 <div class="toast" id="toast" role="status"></div>
 
-<script type="module" src="/js/app.js?v=20261108o"></script>
+<script type="module" src="/js/app.js?v=20261108p"></script>
 </body>
 </html>

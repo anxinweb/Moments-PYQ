@@ -57,6 +57,65 @@ export function attachmentUrl(att) {
   return `${CONFIG.MEMOS_URL}/file/attachments/${id}/${file}`;
 }
 
+/* --------------------------------------------------------------- 赞与评论 */
+
+/** 访客 UUID：点赞去重用，首次访问生成，永久存 localStorage */
+export function visitorId() {
+  let id = localStorage.getItem('pyq-visitor');
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'v-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+    localStorage.setItem('pyq-visitor', id);
+  }
+  return id;
+}
+
+/** 评论/点赞用的昵称（localStorage 持久化） */
+export function getNickname() {
+  return localStorage.getItem('pyq-nick') || '';
+}
+
+export function setNickname(name) {
+  localStorage.setItem('pyq-nick', name);
+}
+
+/** 批量拉取一组动态的点赞状态 */
+export async function getLikes(uids) {
+  if (!uids.length) return {};
+  const qs = new URLSearchParams({ uids: uids.join(','), visitor: visitorId() });
+  const data = await getJSON('/likes?' + qs.toString());
+  return data.likes || {};
+}
+
+/** 点赞 / 取消点赞，返回最新状态 */
+export async function toggleLike(uid, on, name) {
+  const res = await fetch(BASE + '/likes', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ uid, visitor: visitorId(), name: name || '访客', on: !!on }),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+/** 批量拉取一组动态的已过审评论 */
+export async function getComments(uids) {
+  if (!uids.length) return {};
+  const qs = new URLSearchParams({ uids: uids.join(',') });
+  const data = await getJSON('/comments?' + qs.toString());
+  return data.comments || {};
+}
+
+/** 提交评论（先审后发：提交后为待审状态，Memos 里改公开即上架） */
+export async function postComment(uid, name, text) {
+  const res = await fetch(BASE + '/comments', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ uid, name, text }),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
 /** Memos 原生缩略图：约 60-100KB，列表与九宫格专用 */
 export function thumbUrl(url) {
   return url + (url.includes('?') ? '&' : '?') + 'thumbnail=true';

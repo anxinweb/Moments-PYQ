@@ -838,6 +838,74 @@ a {
   color: var(--text);
 }
 
+/* ------------------------------------------------------------------ 评论输入条
+   微信样式：底部灰底条 + 白色输入胶囊 + 绿色发送 */
+
+.comment-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--nav-solid);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-top: 0.5px solid var(--line);
+}
+
+.comment-nick,
+.comment-input {
+  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px; /* ≥16px 防 iOS 聚焦自动放大 */
+  outline: none;
+}
+
+.comment-input {
+  flex: 1;
+}
+
+.comment-nick {
+  flex: 0 0 108px;
+}
+
+.comment-nick::placeholder,
+.comment-input::placeholder {
+  color: var(--text-3);
+}
+
+.comment-send {
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 6px;
+  background: #07c160;
+  color: #ffffff;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.comment-send:disabled {
+  opacity: 0.55;
+}
+
+:root[data-theme="dark"] .comment-nick,
+:root[data-theme="dark"] .comment-input {
+  background: #333333;
+}
+
 /* ------------------------------------------------------------------ 骨架屏 */
 
 .skeleton {

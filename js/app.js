@@ -1,6 +1,17 @@
 import { CONFIG } from './config.js';
-import { getProfile, getMemos, getMemo, PLACEHOLDER_AVATAR } from './api.js';
-import { renderMoment, imagesOf } from './render.js';
+import {
+  getProfile,
+  getMemos,
+  getMemo,
+  getLikes,
+  toggleLike,
+  getComments,
+  postComment,
+  getNickname,
+  setNickname,
+  PLACEHOLDER_AVATAR,
+} from './api.js';
+import { renderMoment, imagesOf, drawerHtml } from './render.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -31,6 +42,10 @@ const el = {
   viewerClose: $('viewerClose'),
   viewerPrev: $('viewerPrev'),
   viewerNext: $('viewerNext'),
+  commentBar: $('commentBar'),
+  commentNick: $('commentNick'),
+  commentInput: $('commentInput'),
+  commentSend: $('commentSend'),
 };
 
 const DESKTOP_MQ = window.matchMedia('(min-width: 768px)');
@@ -270,7 +285,7 @@ function bindMoment(node, opts = {}) {
     const uid = (node.dataset.name || '').split('/')[1];
     if (body && uid) {
       body.addEventListener('click', (e) => {
-        if (e.target.closest('a, button, .cell, .media, .grid, .fold-btn, .popover')) return;
+        if (e.target.closest('a, button, .cell, .media, .grid, .fold-btn, .popover, .drawer')) return;
         location.href = '/?memo=' + uid;
       });
     }
@@ -285,15 +300,49 @@ function bindMoment(node, opts = {}) {
       const willOpen = pop.hidden;
       closePopover();
       if (!willOpen) return;
+      // 打开时按当前状态切换文案：已赞 →「取消」
+      const uid = (node.dataset.name || '').split('/')[1];
+      const liked = engaged.get(uid)?.likes?.liked;
+      const txt = pop.querySelector('[data-act="like"] .pop-txt');
+      if (txt) txt.textContent = liked ? '取消' : '赞';
       pop.hidden = false;
       openPopover = pop;
     });
-    pop.addEventListener('click', (e) => {
+    pop.addEventListener('click', async (e) => {
       const btn = e.target.closest('.pop-btn');
       if (!btn) return;
       const act = btn.dataset.act;
+      const uid = (node.dataset.name || '').split('/')[1];
       closePopover();
-      toast(act === 'like' ? '点赞功能正在接入，马上就能用了' : '评论功能正在接入，马上就能用了');
+      if (!uid) return;
+
+      if (act === 'like') {
+        const liked = engaged.get(uid)?.likes?.liked || false;
+        btn.disabled = true;
+        try {
+          const r = await toggleLike(uid, !liked, getNickname() || '访客');
+          const item = engaged.get(uid) || { comments: [] };
+          item.likes = { count: r.count, names: r.names, liked: r.liked };
+          engaged.set(uid, item);
+          paintDrawer(node);
+        } catch (err) {
+          console.warn('[like]', err);
+          toast('网络开小差了，稍后再试');
+        } finally {
+          btn.disabled = false;
+        }
+      } else {
+        openCommentBar(uid);
+      }
+    });
+  }
+
+  // 点灰底框也可以直接评论（同微信点评论区回复）
+  const drawer = node.querySelector('.drawer');
+  if (drawer) {
+    drawer.addEventListener('click', () => {
+      const uid = (node.dataset.name || '').split('/')[1];
+      if (uid) openCommentBar(uid);
     });
   }
 
@@ -308,6 +357,132 @@ function closePopover() {
   if (!openPopover) return;
   openPopover.hidden = true;
   openPopover = null;
+}
+
+/* --------------------------------------------------------------- 赞与评论数据 */
+
+/** uid -> { likes: {count, names, liked}, comments: [{name, text, time}] } */
+const engaged = new Map();
+
+/** 渲染一组动态后拉取它们的点赞/评论（失败静默，不影响正文） */
+async function loadEngagement(nodes) {
+  const uids = nodes
+    .map((n) => (n.dataset.name || '').split('/')[1])
+    .filter(Boolean);
+  if (!uids.length) return;
+  try {
+    const [likes, comments] = await Promise.all([getLikes(uids), getComments(uids)]);
+    nodes.forEach((n) => {
+      const uid = (n.dataset.name || '').split('/')[1];
+      if (!uid) return;
+      engaged.set(uid, {
+        likes: likes[uid] || { count: 0, names: [], liked: false },
+        comments: comments[uid] || [],
+      });
+      paintDrawer(n);
+    });
+  } catch (err) {
+    console.warn('[engagement]', err);
+  }
+}
+
+function paintDrawer(node) {
+  const uid = (node.dataset.name || '').split('/')[1];
+  const data = engaged.get(uid);
+  const drawer = node.querySelector('.drawer');
+  if (!drawer || !data) return;
+  drawer.innerHTML = drawerHtml(data.likes, data.comments);
+}
+
+/** 发送成功后单独刷新某条动态的评论（过审后 ~30s 内可见） */
+async function refreshComments(uid) {
+  try {
+    const comments = await getComments([uid]);
+    const item = engaged.get(uid) || { likes: { count: 0, names: [], liked: false } };
+    item.comments = comments[uid] || [];
+    engaged.set(uid, item);
+    const node = el.feed.querySelector(`[data-name="memos/${uid}"]`);
+    if (node) paintDrawer(node);
+  } catch (err) {
+    console.warn('[comments]', err);
+  }
+}
+
+/* --------------------------------------------------------------- 评论输入条 */
+
+let commentTargetUid = '';
+
+function openCommentBar(uid) {
+  commentTargetUid = uid;
+  const nick = getNickname();
+  el.commentNick.hidden = !!nick;
+  el.commentNick.value = nick;
+  el.commentInput.value = '';
+  el.commentBar.hidden = false;
+  // 移动端需要用户手势内 focus 才能唤起键盘，这里在同一次点击里聚焦
+  el.commentInput.focus();
+}
+
+function closeCommentBar() {
+  commentTargetUid = '';
+  el.commentBar.hidden = true;
+  el.commentInput.blur();
+  el.commentNick.blur();
+}
+
+async function sendComment() {
+  if (!commentTargetUid) return;
+  const name = el.commentNick.hidden ? getNickname() : el.commentNick.value.trim();
+  const text = el.commentInput.value.trim();
+  if (!el.commentNick.hidden && !name) {
+    toast('先给自己起个昵称吧');
+    el.commentNick.focus();
+    return;
+  }
+  if (!text) {
+    toast('说点什么再发送吧');
+    el.commentInput.focus();
+    return;
+  }
+  el.commentSend.disabled = true;
+  try {
+    setNickname(name);
+    await postComment(commentTargetUid, name, text);
+    const uid = commentTargetUid;
+    closeCommentBar();
+    toast('已提交，审核通过后会显示');
+    refreshComments(uid);
+  } catch (err) {
+    console.warn('[comment]', err);
+    toast('发送失败，稍后再试');
+  } finally {
+    el.commentSend.disabled = false;
+  }
+}
+
+function initCommentBar() {
+  el.commentSend.addEventListener('click', sendComment);
+  el.commentInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      sendComment();
+    }
+  });
+  el.commentNick.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      el.commentInput.focus();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeCommentBar();
+  });
+  // 点输入条以外的空白处收起（点浮层/九宫格等正常交互不受影响）
+  document.addEventListener('click', (e) => {
+    if (el.commentBar.hidden) return;
+    if (e.target.closest('.comment-bar, .popover, .more-btn')) return;
+    closeCommentBar();
+  });
 }
 
 /* --------------------------------------------------------------- 分页加载 */
@@ -342,13 +517,15 @@ function updatePager() {
 function appendMoments(memos) {
   const frag = document.createElement('div');
   frag.innerHTML = memos.map((m) => renderMoment(m, state.profile)).join('');
-  Array.from(frag.children).forEach((n) => {
+  const nodes = Array.from(frag.children);
+  nodes.forEach((n) => {
     el.feed.appendChild(n);
     hydrateImages(n);
     setupFolding(n);
     bindMoment(n);
   });
   state.count += memos.length;
+  loadEngagement(nodes); // 点赞/评论异步补位，不阻塞正文
 }
 
 async function loadOnePage() {
@@ -1003,6 +1180,7 @@ async function loadDetailView(uid) {
     el.feed.appendChild(node);
     hydrateImages(node);
     bindMoment(node, { linkDetail: false });
+    loadEngagement([node]);
     bindShare(memo);
     onScroll();
   } catch (err) {
@@ -1130,6 +1308,7 @@ async function boot() {
   initTheme();
   initScroll();
   initViewer();
+  initCommentBar();
 
   const route = parseRoute();
   const profileTask = ensureProfile();
