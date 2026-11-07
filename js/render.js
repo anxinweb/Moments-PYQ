@@ -103,10 +103,24 @@ function bytesText(n) {
   return (n / 1024 / 1024).toFixed(1) + ' MB';
 }
 
+/** Memos 转码视频的文件名是 video_xxx_0_2.mp4，展示时还原成原视频名 */
+function prettyMediaName(name) {
+  if (!name) return '';
+  if (!name.startsWith('video_')) return name;
+  const stripped = name.replace(/^video_/, '').replace(/_\d+_\d+(\.[a-z0-9]+)$/i, '$1');
+  return stripped || name;
+}
+
 function videoHtml(v) {
+  const vname = prettyMediaName(v.name);
   return (
     `<div class="media media-video">` +
     `<video src="${v.url}" controls playsinline preload="metadata" data-media></video>` +
+    `<a class="media-caption" href="${v.url}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(vname)}">` +
+    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.6v12.8l10-6.4z"></path></svg>` +
+    `<span class="media-caption-name">${escapeHtml(vname || '视频')}</span>` +
+    (v.size ? `<span class="media-caption-size">${bytesText(v.size)}</span>` : '') +
+    `</a>` +
     `</div>`
   );
 }
@@ -118,7 +132,10 @@ function audioHtml(a) {
     `<svg class="ic-play" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10-6.8a1 1 0 0 0 0-1.8l-10-6.8A1 1 0 0 0 8 5.2z"/></svg>` +
     `<svg class="ic-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"/></svg>` +
     `</button>` +
+    `<span class="audio-main">` +
+    `<span class="audio-name" title="${escapeHtml(a.name)}">${escapeHtml(a.name || '音频')}</span>` +
     `<span class="audio-bars"><span class="audio-fill"></span></span>` +
+    `</span>` +
     `<span class="audio-time">0:00</span>` +
     `<audio src="${a.url}" preload="metadata"></audio>` +
     `</div>`
@@ -162,7 +179,7 @@ export function renderMoment(memo, profile) {
 
   return (
     `<article class="moment" data-name="${escapeHtml(memo.name)}">` +
-    `<img class="moment-avatar" src="${avatar}" alt="" loading="lazy" decoding="async">` +
+    `<img class="moment-avatar" src="${avatar}" data-avatar="${avatar}" alt="" decoding="async">` +
     `<div class="moment-body">` +
     `<h2 class="moment-name">${escapeHtml(name)}</h2>` +
     (hasText ? `<div class="moment-text is-folded">${body}</div>` : '') +

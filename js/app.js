@@ -19,6 +19,7 @@ const el = {
   retry: $('retryBtn'),
   toast: $('toast'),
   topBtn: $('topBtn'),
+  navTitle: $('navTitle'),
   themeBtn: $('themeBtn'),
   postBtn: $('postBtn'),
   viewer: $('viewer'),
@@ -41,6 +42,7 @@ const state = {
   loading: false,
   failed: false,
   coverSet: false,
+  booting: true,
 };
 
 /* --------------------------------------------------------------- 主题 */
@@ -73,8 +75,10 @@ function toast(text) {
 
 function applyProfile(profile) {
   state.profile = profile;
+  const avatar = profile.avatar || PLACEHOLDER_AVATAR;
+
   el.coverName.textContent = profile.name;
-  el.coverAvatar.src = profile.avatar || PLACEHOLDER_AVATAR;
+  el.coverAvatar.src = avatar;
   el.coverAvatar.addEventListener(
     'error',
     () => {
@@ -84,6 +88,14 @@ function applyProfile(profile) {
   );
   el.postBtn.href = CONFIG.POST_URL;
   document.title = CONFIG.SITE_TITLE;
+
+  // 刷新 ?page=n 时信息流走 CDN 缓存会比资料先到，那时头像渲染成占位图，
+  // 资料回来后统一回填一次，避免前面几条的头像一直是灰块
+  document.querySelectorAll('.moment-avatar').forEach((img) => {
+    if (img.dataset.avatar === avatar) return;
+    img.dataset.avatar = avatar;
+    img.src = avatar;
+  });
 }
 
 function setCover(url) {
@@ -103,6 +115,8 @@ function applyCoverPosition() {
 }
 
 function initCover() {
+  // 封面头像先放占位图，等资料回来再换，避免刷新时出现破图
+  el.coverAvatar.src = PLACEHOLDER_AVATAR;
   if (CONFIG.COVER.MODE === 'none') {
     el.coverImg.remove();
     return;
@@ -130,6 +144,14 @@ function hydrateImages(root) {
     else img.addEventListener('load', done);
 
     img.addEventListener('error', () => {
+      // 头像挂了就退回占位图，避免留下破图
+      if (img.classList.contains('moment-avatar')) {
+        if (!img.dataset.avatarFallback) {
+          img.dataset.avatarFallback = '1';
+          img.src = PLACEHOLDER_AVATAR;
+        }
+        return;
+      }
       // 缩略图失败（老附件可能没有缩略图）→ 回退原图，只回退一次
       const origin = img.dataset.origin;
       if (origin && !img.dataset.fallbackUsed && !img.src.endsWith(origin)) {
@@ -244,6 +266,8 @@ function pageFromUrl() {
 }
 
 function syncUrl() {
+  // 启动阶段（?page=n 逐页补拉）先不改地址栏，避免刷新时 URL 在 1/2/3 之间抖动
+  if (state.booting) return;
   const next =
     state.loadedPages > 1
       ? `${location.pathname}?page=${state.loadedPages}`
@@ -529,6 +553,7 @@ function initViewer() {
   let downAt = 0;
   let moved = false;
   let edgeX = 0;
+  let pinched = false;
   let pinchDist = 0;
   let pinchScale = 1;
   let pinchMidX = 0;
@@ -560,6 +585,7 @@ function initViewer() {
       pinchPanX = viewer.panX;
       pinchPanY = viewer.panY;
       moved = true;
+      pinched = true; // 本次手势是捏合：抬手时不能被当成轻点还原
       clearTimeout(tapTimer);
     }
   });
@@ -626,6 +652,10 @@ function initViewer() {
     }
     if (pointers.size > 0) return;
 
+    // 刚做完捏合缩放：这次抬手一律不做轻点判定，否则手指一松就回缩
+    const wasPinch = pinched;
+    pinched = false;
+
     const dx = e.clientX - downX;
     const dy = e.clientY - downY;
     const quick = performance.now() - downAt < 320;
@@ -648,7 +678,7 @@ function initViewer() {
         return;
       }
       edgeX = 0;
-      if (isTap && quick) zoomTo(1);
+      if (!wasPinch && isTap && quick) zoomTo(1);
       return;
     }
 
@@ -669,6 +699,9 @@ function initViewer() {
       return;
     }
     if (!isTap) return;
+
+    // 捏合结束后手指离开不算轻点，别把刚放大的图关掉
+    if (wasPinch) return;
 
     // 鼠标端交给 dblclick 处理（单击不关闭，对齐微信 PC 版）
     if (e.pointerType !== 'touch') return;
@@ -742,6 +775,12 @@ function onScroll() {
 function initScroll() {
   window.addEventListener('scroll', onScroll, { passive: true });
   el.topBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  // 点标题回主页顶部（同微信状态栏点一下回顶），保留 ctrl/⌘ 点击开新标签
+  el.navTitle.addEventListener('click', (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
   onScroll();
 }
 
@@ -764,6 +803,10 @@ async function boot() {
   firstPageTask = getMemos({ pageToken: '' });
 
   await Promise.all([profileTask, gotoPage(pageFromUrl())]);
+
+  state.booting = false;
+  syncUrl();
+  onScroll();
 }
 
 boot();
