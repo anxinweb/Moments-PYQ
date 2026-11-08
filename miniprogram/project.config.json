@@ -1,0 +1,23 @@
+{
+  "description": "朋友圈 · 纯展示微信小程序（只读，数据来自 pyq.ahxin.cn）",
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": ".workbuddy"
+      }
+    ],
+    "include": []
+  },
+  "setting": {
+    "bundle": false,
+    "es6": true,
+    "minified": true,
+    "postcss": true,
+    "urlCheck": false
+  },
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "moments-pyq",
+  "miniprogramRoot": "./"
+}

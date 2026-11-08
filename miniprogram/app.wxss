@@ -1,0 +1,16 @@
+page {
+    min-height: 100%;
+    background: #ededed;
+    color: #191919;
+    font-size: 16px;
+    line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+}
+
+view,
+text,
+image,
+video {
+    box-sizing: border-box;
+}

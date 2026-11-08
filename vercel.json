@@ -8,10 +8,19 @@
   ],
   "headers": [
     {
-      "source": "/(css|js)/(.*)",
+      "source": "/(css|js|assets)/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        { "key": "Cache-Control", "value": "public, max-age=3600, stale-while-revalidate=86400" }
+      ]
+    },
+    {
+      "source": "/api/(feed|memo|comments|profile)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, s-maxage=60, stale-while-revalidate=600" }
       ]
     }
+  ],
+  "crons": [
+    { "path": "/api/backup-likes", "schedule": "0 20 * * *" }
   ]
 }

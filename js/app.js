@@ -61,6 +61,7 @@ const state = {
   failed: false,
   coverSet: false,
   booting: true,
+  firstIds: '',
 };
 
 /* --------------------------------------------------------------- 主题 */
@@ -612,8 +613,52 @@ function bindCommentInline(node) {
     }
   });
   // 语音/表情/图片占位图标（微信同款外观，功能暂未开放）
-  box.querySelectorAll('.comment-emos button').forEach((b) => {
-    b.addEventListener('click', () => toast('暂不支持语音 / 表情 / 图片评论'));
+  // 表情：打开面板点选插入；语音/图片仍是占位
+  const panel = box.querySelector('.emoji-panel');
+  const toggle = box.querySelector('.emoji-toggle');
+  const closePanel = () => {
+    if (!panel) return;
+    panel.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+  };
+  if (toggle && panel) {
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      panel.hidden = !panel.hidden;
+      toggle.setAttribute('aria-expanded', String(!panel.hidden));
+      if (!panel.hidden) {
+        // 面板展开时把光标放回输入框，插入位置才正确
+        input.focus();
+      }
+    });
+    panel.addEventListener('click', (e) => {
+      const btn = e.target.closest('.emoji-item');
+      if (!btn) return;
+      e.stopPropagation();
+      const emoji = btn.textContent || '';
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
+      const pos = start + emoji.length;
+      input.focus();
+      try {
+        input.setSelectionRange(pos, pos);
+      } catch (err) {
+        /* ignore */
+      }
+      send.disabled = input.value.trim().length === 0;
+      // 插入后淡出面板，避免挡住正文
+      closePanel();
+    });
+    document.addEventListener('click', (e) => {
+      if (panel.hidden) return;
+      if (e.target.closest('.emoji-panel') || e.target.closest('.emoji-toggle')) return;
+      closePanel();
+    });
+  }
+  // 语音 / 图片仍是占位
+  box.querySelectorAll('.comment-emos button:not(.emoji-toggle)').forEach((b) => {
+    b.addEventListener('click', () => toast('暂不支持语音 / 图片评论'));
   });
 }
 
@@ -636,6 +681,92 @@ let firstPageTask = null;
 
 /** 下一页预取：当前页渲染完就提前拉下一页，点「加载更多」几乎无等待 */
 let nextPageTask = null;
+
+/* --------------------------------------------------------------- 首屏快照
+   首次打开要等 /api/feed 绕到海外 Vercel 回源（1.5~3s），骨架会空一会儿。
+   把上一页数据存本地，下次打开先用旧数据秒渲染，再后台换新（前端版 stale-while-revalidate）。 */
+
+const SNAPSHOT_KEY = 'pyq-feed-v1';
+const SNAPSHOT_TTL = 7 * 24 * 3600 * 1000;
+
+function readSnapshot() {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || !Array.isArray(s.memos) || !s.memos.length) return null;
+    if (!s.t || Date.now() - s.t > SNAPSHOT_TTL) return null;
+    return s;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeSnapshot(memos, nextPageToken) {
+  try {
+    localStorage.setItem(
+      SNAPSHOT_KEY,
+      JSON.stringify({
+        t: Date.now(),
+        memos: (memos || []).slice(0, CONFIG.PAGE_SIZE),
+        nextPageToken: nextPageToken || '',
+      })
+    );
+  } catch (e) {
+    /* 本地存储满了就放弃，不影响主流程 */
+  }
+}
+
+function readCachedProfile() {
+  try {
+    return JSON.parse(localStorage.getItem('pyq-profile-v1') || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+function cacheProfile(profile) {
+  try {
+    localStorage.setItem('pyq-profile-v1', JSON.stringify(profile));
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+/** 用快照垫一屏，返回是否垫上了 */
+function paintSnapshot() {
+  const snap = readSnapshot();
+  if (!snap) return false;
+  el.feed.innerHTML = '';
+  state.count = 0;
+  appendMoments(snap.memos);
+  state.loadedPages = 1;
+  state.tokens[1] = snap.nextPageToken || '';
+  state.done = !snap.nextPageToken;
+  state.firstIds = snap.memos.map((m) => m.name || m.uid || '').join(',');
+  pickCoverFromMemos(snap.memos);
+  return true;
+}
+
+/** 后台拉最新首页：用户还没滚动就原地换新，滚下去了只更新本地快照 */
+async function refreshFirstPage(reqPromise) {
+  try {
+    const { memos, nextPageToken } = await (reqPromise || getMemos({ pageToken: '' }));
+    writeSnapshot(memos, nextPageToken);
+    const ids = memos.map((m) => m.name || m.uid || '').join(',');
+    if (state.loadedPages === 1 && !state.loading && window.scrollY < 400 && ids !== state.firstIds) {
+      el.feed.innerHTML = '';
+      state.count = 0;
+      appendMoments(memos);
+      state.tokens[1] = nextPageToken || '';
+      state.done = !nextPageToken;
+      state.firstIds = ids;
+      updatePager();
+    }
+  } catch (err) {
+    console.warn('[feed refresh]', err);
+  }
+}
 
 function pageFromUrl() {
   const n = parseInt(new URLSearchParams(location.search).get('page') || '1', 10);
@@ -707,6 +838,11 @@ async function loadOnePage() {
     appendMoments(memos);
     state.loadedPages += 1;
     state.tokens[state.loadedPages] = nextPageToken;
+    // 第一页落盘，下次打开可秒开
+    if (state.loadedPages === 1) {
+      state.firstIds = memos.map((m) => m.name || m.uid || '').join(',');
+      writeSnapshot(memos, nextPageToken);
+    }
     if (!nextPageToken) state.done = true;
     syncUrl();
 
@@ -1413,6 +1549,7 @@ function ensureProfile() {
     profileReady = getProfile()
       .then((p) => {
         applyProfile(p);
+        cacheProfile(p);
         return p;
       })
       .catch(() => {
@@ -1487,8 +1624,13 @@ async function boot() {
   });
 
   // 资料与首屏动态并行请求
-  firstPageTask = getMemos({ pageToken: '' });
+  const cachedProfile = readCachedProfile();
+  if (cachedProfile) applyProfile(cachedProfile); // 昵称/头像先用缓存，不用等接口
+  const hadSnapshot = paintSnapshot();
+  const freshFirstPage = hadSnapshot ? getMemos({ pageToken: '' }) : null;
+  if (!hadSnapshot) firstPageTask = getMemos({ pageToken: '' });
   await Promise.all([profileTask, gotoPage(pageFromUrl())]);
+  if (freshFirstPage) refreshFirstPage(freshFirstPage);
 
   state.booting = false;
   syncUrl();

@@ -260,6 +260,22 @@ export function renderMoment(memo, profile, opts = {}) {
   );
 }
 
+/** 评论可用表情（够日常用，点一下插到光标处） */
+const EMOJIS = [
+  '😀', '😄', '😂', '🤣', '😊', '🥰', '😍', '😘',
+  '😜', '🤪', '🙃', '😅', '😭', '😢', '😮', '🤔',
+  '😴', '😎', '🥳', '😇', '👍', '👎', '👏', '🙏',
+  '💪', '🤝', '✌️', '👌', '❤️', '💔', '💯', '🔥',
+  '🎉', '✨', '⭐', '🌙', '☀️', '🌈', '🍀', '🌸',
+  '🍜', '🍺', '☕', '🎂', '🎵', '📷', '🚗', '🐱',
+];
+
+function emojiPanelHtml() {
+  return `<div class="emoji-panel" hidden>${EMOJIS.map(
+    (e) => `<button type="button" class="emoji-item">${e}</button>`
+  ).join('')}</div>`;
+}
+
 /** 内联评论输入（微信同款：点「评论」后在动态下方就地展开） */
 export function commentInlineHtml() {
   return (
@@ -282,7 +298,7 @@ export function commentInlineHtml() {
     `<div class="comment-tools">` +
     `<div class="comment-emos">` +
     `<button type="button" aria-label="语音"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 19v3"/></svg></button>` +
-    `<button type="button" aria-label="表情"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><line x1="9" y1="9.5" x2="9.01" y2="9.5"/><line x1="15" y1="9.5" x2="15.01" y2="9.5"/></svg></button>` +
+    `<button type="button" class="emoji-toggle" aria-label="表情" aria-expanded="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><line x1="9" y1="9.5" x2="9.01" y2="9.5"/><line x1="15" y1="9.5" x2="15.01" y2="9.5"/></svg></button>` +
     `<button type="button" aria-label="图片"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>` +
     `</div>` +
     `<div class="comment-actions">` +
@@ -291,6 +307,7 @@ export function commentInlineHtml() {
     `</div>` +
     `</div>` +
     `</div>` +
+    emojiPanelHtml() +
     `</div>`
   );
 }

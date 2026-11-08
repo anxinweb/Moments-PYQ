@@ -1,5 +1,6 @@
 const UPSTREAM = 'https://memos.ahxin.cn';
 const TOKEN = process.env.MEMOS_TOKEN;
+const NOTIFY_KEY = process.env.NOTIFY_KEY;
 
 export const config = { runtime: 'edge' };
 
@@ -51,7 +52,23 @@ function parseComment(raw) {
 
 const byTime = (a, b) => (a.time < b.time ? -1 : 1);
 
-export default async function handler(request) {
+/** 评论落地后异步发一封带内容的通知邮件（失败不影响评论提交） */
+function fireNotify(context, origin, payload) {
+  if (!NOTIFY_KEY) return;
+  const task = fetch(`${origin}/api/notify`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-notify-key': NOTIFY_KEY },
+    body: JSON.stringify(payload),
+  })
+    .then(() => undefined)
+    .catch(() => undefined);
+  if (context && typeof context.waitUntil === 'function') {
+    context.waitUntil(task);
+  }
+  return task;
+}
+
+export default async function handler(request, context) {
   const url = new URL(request.url);
 
   try {
@@ -167,7 +184,17 @@ export default async function handler(request) {
       });
       if (!res.ok) return json({ error: 'memos_rejected' }, 502);
       const created = await res.json().catch(() => null);
-      return json({ ok: true, pending: true, uid: (created && created.name || '').split('/')[1] || '' });
+      const createdUid = ((created && created.name) || '').split('/')[1] || '';
+      // 自己发一封含评论内容的通知邮件（Memos 官方邮件不含内容）
+      fireNotify(context, url.origin, {
+        name,
+        text,
+        url: link,
+        replyName: replyTo ? replyName : '',
+        memoUid: uid,
+        commentUid: createdUid,
+      });
+      return json({ ok: true, pending: true, uid: createdUid });
     }
 
     return json({ error: 'method_not_allowed' }, 405);

@@ -47,6 +47,21 @@ node dev-server.mjs
 2. Vercel 导入仓库（框架预设选 Other，无需构建命令）
 3. 绑定域名 `pyq.ahxin.cn`
 
+### 环境变量（Vercel → Settings → Environment Variables）
+
+| 变量 | 用途 |
+|---|---|
+| `MEMOS_TOKEN` | 评论以 guest 账号身份写入 Memos（评论者≠动态作者，站主才能收到通知） |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 点赞存储 |
+| `SMTP_USER` / `SMTP_PASS` | 评论通知发件邮箱（QQ 邮箱填「授权码」，非登录密码） |
+| `NOTIFY_TO` | 通知收件邮箱，默认同 `SMTP_USER` |
+| `NOTIFY_KEY` | 内部接口密钥（随机字符串即可），`/api/notify`、`/api/backup-likes` 手动触发时校验 |
+| `CRON_SECRET`（可选） | Vercel Cron 调用 `/api/backup-likes` 时的鉴权 |
+
+- 评论邮件通知：`/api/notify`（Node 运行时，直连 smtp.qq.com:465），评论落地后异步发送，失败不影响评论
+- 点赞备份：Vercel Cron 每天 04:00（北京时间）把 Redis 里的点赞快照成一条私有 memo 存进 Memos，搜 `#like-backup` 可查
+- 分享卡片：`middleware.js` 在边缘给 `/?memo=uid` 注入 OG 标签（标题/摘要/首图缩略）
+
 ## 常用配置（js/config.js）
 
 | 想改什么 | 改哪里 |
@@ -61,6 +76,7 @@ node dev-server.mjs
 
 - [x] P0 数据层重写 + 首页视觉还原
 - [x] P0.5 分页改造、Memos 原生缩略图、固定封面、响应式
-- [ ] P1 单条详情页、分享/复制链接
-- [ ] P2 评论（专用账号，可见性=审核开关）+ 真实点赞（Upstash Redis）
-- [ ] P3 环境变量、上线核对
+- [x] P1 单条详情页、分享/复制链接、资料页、PWA
+- [x] P2 评论（两级回复/超链接/审核流）+ 真实点赞
+- [x] P3 上线（Vercel + EdgeOne CDN）
+- [x] P4 首屏快照秒开、OG 分享卡片、评论邮件通知、点赞每日备份、表情面板、深色打磨
