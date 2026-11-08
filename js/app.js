@@ -1551,8 +1551,12 @@ function bindShare(memo) {
   el.shareBtn.addEventListener('click', async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: CONFIG.SITE_TITLE, text, url });
-        return;
+        // 有些桌面浏览器 navigator.share 存在但会卡住，1.2s 没结果就退回复制
+        const r = await Promise.race([
+          navigator.share({ title: CONFIG.SITE_TITLE, text, url }).then(() => 'shared'),
+          new Promise((res) => setTimeout(() => res('timeout'), 1200)),
+        ]);
+        if (r === 'shared') return;
       } catch (e) {
         if (e && e.name === 'AbortError') return; // 用户取消
       }
