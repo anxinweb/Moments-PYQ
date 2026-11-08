@@ -1696,16 +1696,6 @@ async function boot() {
     if (e.key === 'Escape') closePopover();
   });
 
-  // 视频动态：平时只显示封面帧（零视频流量），点播放按钮才真正加载视频
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.video-play');
-    if (!btn) return;
-    const frame = btn.closest('.video-frame');
-    if (!frame) return;
-    e.stopPropagation();
-    frame.innerHTML = `<video src="${btn.dataset.videoUrl}" controls autoplay playsinline></video>`;
-  });
-
   // 资料与首屏动态并行请求
   const cachedProfile = readCachedProfile();
   if (cachedProfile) applyProfile(cachedProfile); // 昵称/头像先用缓存，不用等接口

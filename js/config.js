@@ -35,16 +35,6 @@ export const CONFIG = {
     DESKTOP_POS: '50% 45%',
   },
 
-  /* ---------------- 视频封面 ----------------
-   * 视频动态默认显示黑色占位，点播放才加载视频（不浪费流量）。
-   * 想给某个视频配画面：用 .preview/make-video-poster.mjs 抽一帧存到 assets/，
-   * 再在这里加一条「附件id → 图片路径」即可。附件 id 是 Memos 附件 URL 里
-   * /attachments/<这一段>/ 的那串字符（不区分大小写）。
-   */
-  VIDEO_POSTERS: {
-    XQpgdfqXqohYWcTokBUed6: '/assets/video-poster-xqpgdfqxqohywctokbued6.jpg',
-  },
-
   // 是否隐藏正文里的 #标签（朋友圈没有标签体系）
   HIDE_TAGS: true,
 

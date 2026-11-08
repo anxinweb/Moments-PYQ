@@ -13,6 +13,7 @@
 - feed 需按 creator==users/ahxin 过滤；CORS 仅放行 pyq.ahxin.cn → 同源 Edge 代理
 - 仓库 anxinweb/Moments-PYQ：GitHub MCP unauthorized，用本地 git push；远端 main 分支 2026-11-08 重建过
 - **弱网兜底**（v20261109f）：所有 GET 走 api.js `getJSON`（统一 10s 超时 + 自动重试 1 次），新增请求别绕过它；首屏 6s 无数据弹 .feed-note「网络有点慢」+ 重载，失败显示失败态而非空白；封面 setCover 需 complete 兜底（iOS 缓存命中可能不触发 load）
+- **视频封面**（v20261109g）：视频动态=静态封面帧+播放按钮，点播放才加载视频（零流量）；封面图 assets/video-poster-<附件id>.jpg 由 .preview/make-video-poster.mjs 抽帧；映射在 config.js VIDEO_POSTERS（附件 id 从 v.url 正则提取，mediaOf 已把 name 重写为 filename 不能用）
 
 ## 当前方案（用户拍板）
 - 评论存 Memos（令牌在 Vercel MEMOS_TOKEN，**待用户换成主号令牌**），可见性=审核开关（PRIVATE=待审，PUBLIC=过审）
@@ -57,3 +58,5 @@
 - 1.0.2 细节全量落地：正文长按复制（折叠态用普通 text 保 line-clamp）、字号跟随微信设置（根节点 font-size + em）、分享标题清洗、无图转发封面回退头像、音频时长与进度条、视频 poster 启发式、资料页 v1.0.2
 - **Memos 不生成视频配套封面帧**（实测唯一视频动态只有 1 个 mp4）→ 同条动态有图时用首图作 poster，否则保持原生播放按钮
 - `format.js` 新增 `clockText / shareTitle / fontScale`；`config.js` 新增 `VERSION / FALLBACK_SHARE_IMAGE`
+- **修复短文本无法长按复制**：`buildMoment` 曾给所有动态写 `folded: true`，短文本 `needFold=false` 既无「全文」按钮又拿不到 `user-select` → 永久不可复制。已改 `folded: needFold`，WXML 分支收紧为 `needFold && folded` 双重判断；可复制 text 加 `.text-selectable{display:block}` 扩大长按热区（真实数据首屏 20 条中 14 条受影响）
+- 注意：`user-select` 的系统选词菜单在**开发者工具模拟器里常不弹出**，验收长按复制必须点「预览」用真机；若真机仍无效，备选是改 `bindlongpress` 直接复制整段正文 + toast（更接近微信朋友圈，但会与 user-select 选词冲突，不能同时用）

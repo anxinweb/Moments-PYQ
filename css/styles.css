@@ -515,57 +515,6 @@ a {
   background: #000;
 }
 
-/* 视频封面帧 + 微信同款播放按钮：点播放才加载视频，平时零视频流量 */
-.media-video {
-  position: relative;
-  max-width: min(100%, 250px);
-}
-
-.video-frame {
-  position: relative;
-}
-
-.video-poster {
-  display: block;
-  width: 100%;
-  max-height: 62vh;
-  object-fit: cover;
-  border-radius: 4px;
-  background: #000;
-}
-
-.video-poster-empty {
-  aspect-ratio: 3 / 4;
-  background: linear-gradient(160deg, #2c2c2c 0%, #111 100%);
-}
-
-.video-play {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  background: rgba(0, 0, 0, 0.45);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.video-play svg {
-  margin-left: 4px; /* 视觉居中：三角形重心偏右 */
-}
-
-.video-play:active {
-  opacity: 0.75;
-  transform: translate(-50%, -50%) scale(0.94);
-}
-
 .media-caption {
   display: flex;
   align-items: center;
