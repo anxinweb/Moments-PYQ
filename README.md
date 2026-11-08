@@ -59,14 +59,33 @@ node dev-server.mjs
 | `CRON_SECRET`（可选） | Vercel Cron 调用 `/api/backup-likes` 时的鉴权 |
 
 - 评论邮件通知：`/api/notify`（Node 运行时，直连 smtp.qq.com:465），评论落地后异步发送，失败不影响评论
-- 点赞备份：Vercel Cron 每天 04:00（北京时间）把 Redis 里的点赞快照成一条私有 memo 存进 Memos，搜 `#like-backup` 可查
+- 点赞备份：Vercel Cron 每天 04:00（北京时间）把 Redis 里的点赞快照成一条私有 memo 存进 Memos，搜 `#like-backup` 可查（每天一条，定期清理旧快照即可）
 - 分享卡片：`middleware.js` 在边缘给 `/?memo=uid` 注入 OG 标签（标题/摘要/首图缩略）
+
+### 点赞备份怎么恢复
+
+1. 在 Memos 里搜 `#like-backup`，打开最近一条快照，复制 ```json 代码块里的内容
+2. 本地存成 `backup.json`，在项目根目录执行（需要 `.env.local` 里有 Upstash 凭据）：
+
+```bash
+node -e '
+const fs=require("fs");const env=fs.readFileSync(".env.local","utf8");
+const U=(env.match(/UPSTASH_REDIS_REST_URL="(.*)"/)||[])[1];
+const T=(env.match(/UPSTASH_REDIS_REST_TOKEN="(.*)"/)||[])[1];
+const {likes}=JSON.parse(fs.readFileSync("backup.json","utf8"));
+const cmds=[];
+for(const [uid,obj] of Object.entries(likes)) for(const [visitor,val] of Object.entries(obj)) cmds.push(["HSET","like:"+uid,visitor,val]);
+fetch(U.replace(/\/$/,"")+"/pipeline",{method:"POST",headers:{authorization:"Bearer "+T,"content-type":"application/json"},body:JSON.stringify(cmds)})
+  .then(r=>r.json()).then(d=>console.log("已恢复",cmds.length,"条点赞")).catch(console.error);
+'
+```
 
 ## 常用配置（js/config.js）
 
 | 想改什么 | 改哪里 |
 |---|---|
-| 换封面 | 替换 `assets/cover.jpg`，或 `COVER.URL` 指向新图/外链 |
+| 换封面 | ① 替换 `assets/cover.jpg`（小程序同步替换 `miniprogram/images/cover.jpg`）② 把 `index.html` 里 preload 和 `COVER.URL` 的 `?v=` 改成新日期 ③ 提交推送，否则 CDN 会缓存旧图 |
+| 封面用外链 | `COVER.URL` 直接填图片网址（同样建议带 `?v=`） |
 | 封面裁切重心 | `COVER.MOBILE_POS` / `COVER.DESKTOP_POS` |
 | 封面改成自动取最新配图 | `COVER.MODE: 'memo'` |
 | 每页条数 | `PAGE_SIZE` |
