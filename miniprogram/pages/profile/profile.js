@@ -17,7 +17,7 @@ Page({
   },
 
   onLoad: function () {
-    const sys = wx.getSystemInfoSync();
+    const sys = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
     const bar = sys.statusBarHeight || 20;
     this.setData({ statusBarHeight: bar, contentTop: bar + 44 + 24 });
     getProfile()

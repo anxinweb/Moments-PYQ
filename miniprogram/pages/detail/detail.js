@@ -31,7 +31,7 @@ Page({
 
   onLoad: function (options) {
     const uid = (options && options.uid) || '';
-    const sys = wx.getSystemInfoSync();
+    const sys = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
     const bar = sys.statusBarHeight || 20;
     const width = sys.windowWidth || 375;
     const contentW = width - 84;

@@ -37,7 +37,8 @@ Page({
   },
 
   onLoad: function () {
-    const sys = wx.getSystemInfoSync();
+    // 新基础库优先 getWindowInfo（getSystemInfoSync 已标记弃用，会打警告）
+    const sys = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
     const width = sys.windowWidth || 375;
     const height = sys.windowHeight || 700;
     // 与 WXSS 的固定 px 布局对应：左右 16 + 头像 40 + 间距 12

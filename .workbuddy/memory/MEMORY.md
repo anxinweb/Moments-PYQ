@@ -39,3 +39,7 @@
 - **权限结论**：转发 `onShareAppMessage` / 复制 `wx.setClipboardData` 零申请；`web-view` 外链与 `onShareTimeline` 需资质，已避开；不能由代码指定好友，只能用户点转发按钮自己选
 - 详情页用 `/api/memo?uid=` 冷启动可打开；分享 path=`/pages/detail/detail?uid=xxx`；`detail.wxss` 用 `@import` 复用首页样式
 - 静态校验 + 真实接口链路全过；预览卡沿用 wbapp_qIhaUS8EW6TakWNQrLVtcp
+- 真实 AppID `wx83865dd6608c01c3` 已写入 project.config.json；用户自己用微信开发者工具发布，不走 WorkBuddy 发布链路
+- **导入目录必须是 `miniprogram/` 子目录**（不是项目根）；`urlCheck:false` 便于调试，上传前需配白名单并改回 true
+- 发布前总检全 PASS（静态 + mock 三页面全链路 + 远程资源 206）；`getSystemInfoSync` 已改为优先 `getWindowInfo` 兼容
+- 上传前平台侧必做：request 白名单 pyq.ahxin.cn、downloadFile 白名单 memos.ahxin.cn（真机只认白名单）
