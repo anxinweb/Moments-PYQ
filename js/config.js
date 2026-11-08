@@ -53,8 +53,8 @@ export const CONFIG = {
    *   { label: '按钮文字', url: 'https://...' }
    */
   PROFILE_LINKS: [
-    // { label: '我的博客', url: 'https://ahxin.cn' },
-    // { label: 'GitHub', url: 'https://github.com/anxinweb' },
+    { label: '博客', url: 'https://blog.ahxin.cn/' },
+    { label: '主页', url: 'https://ahxin.cn/' },
   ],
 
   /* ---------------- 评论（P2 生效） ----------------
