@@ -99,3 +99,19 @@
     line-height: 1.6;
     color: #b2b2b2;
 }
+
+/* 字号跟随微信字体设置：根节点 font-size 由 JS 注入，默认 16px 时与原有 px 一致 */
+.profile-name { font-size: 1.125em; }
+.profile-bio { font-size: 0.875em; }
+.link-label { font-size: 1em; }
+.link-url { font-size: 0.75em; }
+.link-copy { font-size: 0.8125em; }
+
+.version {
+    display: block;
+    margin-top: 4px;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: #c8c8c8;
+}

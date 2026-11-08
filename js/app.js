@@ -345,6 +345,7 @@ function bindMoment(node, opts = {}) {
   if (drawer) {
     drawer.addEventListener('click', (e) => {
       if (e.target.closest('a')) return; // 点昵称/链接是跳转，不是回复
+      if (e.target.closest('.drawer-likes')) return; // 点赞区域点了不该弹评论框（同微信）
       const uid = (node.dataset.name || '').split('/')[1];
       if (!uid) return;
       const row = e.target.closest('.comment');
@@ -1693,6 +1694,16 @@ async function boot() {
   window.addEventListener('scroll', closePopover, { passive: true });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePopover();
+  });
+
+  // 视频动态：平时只显示封面帧（零视频流量），点播放按钮才真正加载视频
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.video-play');
+    if (!btn) return;
+    const frame = btn.closest('.video-frame');
+    if (!frame) return;
+    e.stopPropagation();
+    frame.innerHTML = `<video src="${btn.dataset.videoUrl}" controls autoplay playsinline></video>`;
   });
 
   // 资料与首屏动态并行请求

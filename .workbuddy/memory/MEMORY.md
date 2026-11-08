@@ -12,6 +12,7 @@
 - **Memos 原生缩略图可用**：`?thumbnail=true`；列表用缩略图、灯箱用原图
 - feed 需按 creator==users/ahxin 过滤；CORS 仅放行 pyq.ahxin.cn → 同源 Edge 代理
 - 仓库 anxinweb/Moments-PYQ：GitHub MCP unauthorized，用本地 git push；远端 main 分支 2026-11-08 重建过
+- **弱网兜底**（v20261109f）：所有 GET 走 api.js `getJSON`（统一 10s 超时 + 自动重试 1 次），新增请求别绕过它；首屏 6s 无数据弹 .feed-note「网络有点慢」+ 重载，失败显示失败态而非空白；封面 setCover 需 complete 兜底（iOS 缓存命中可能不触发 load）
 
 ## 当前方案（用户拍板）
 - 评论存 Memos（令牌在 Vercel MEMOS_TOKEN，**待用户换成主号令牌**），可见性=审核开关（PRIVATE=待审，PUBLIC=过审）
@@ -53,3 +54,6 @@
 - 搜索需求待定：建议先不加；若做优先前端本地过滤（A 轻量版），后端方案需新增 `api/search.js` + redeploy Vercel
 - 详情页分享已收纳进时间行「两点」菜单（复制链接｜分享给好友，深色浮层+小三角，与网页版同款）；旧绿色大按钮、URL 文本框与说明文字全部删除
 - 发布前总审全 PASS（静态 / 三页面真实链路 / 数据绑定 0 未定义 / 8 个远程资源 200-206）；README 与 .gitignore 一致性已修正；平台侧待办仍是白名单 / 备案 / 类目 / 上传
+- 1.0.2 细节全量落地：正文长按复制（折叠态用普通 text 保 line-clamp）、字号跟随微信设置（根节点 font-size + em）、分享标题清洗、无图转发封面回退头像、音频时长与进度条、视频 poster 启发式、资料页 v1.0.2
+- **Memos 不生成视频配套封面帧**（实测唯一视频动态只有 1 个 mp4）→ 同条动态有图时用首图作 poster，否则保持原生播放按钮
+- `format.js` 新增 `clockText / shareTitle / fontScale`；`config.js` 新增 `VERSION / FALLBACK_SHARE_IMAGE`

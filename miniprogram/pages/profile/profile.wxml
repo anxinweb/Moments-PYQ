@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page" style="font-size:{{fontPx}}">
   <view class="sub-nav" style="padding-top:{{statusBarHeight}}px">
     <view class="sub-nav-inner">
       <view class="sub-nav-back" bindtap="goBack"><text class="sub-nav-back-icon">‹</text></view>
@@ -26,5 +26,6 @@
     </view>
 
     <text class="hint">小程序内不打开外部网页，复制后到浏览器粘贴访问即可。</text>
+    <text class="version">v{{version}}</text>
   </view>
 </view>

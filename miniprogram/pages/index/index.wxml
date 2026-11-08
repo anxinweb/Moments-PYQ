@@ -1,4 +1,4 @@
-<view class="app">
+<view class="app" style="font-size:{{fontPx}}">
 
   <!-- 沉浸式自定义导航：只有标题；转发由右上角「…」菜单触发 -->
   <view class="nav {{navSolid ? 'is-solid' : ''}}" style="padding-top:{{statusBarHeight}}px">
@@ -20,7 +20,7 @@
     </view>
   </view>
 
-  <!-- 信息流：点头像或昵称 → 该条详情页；正文与媒体不可点 -->
+  <!-- 信息流：点头像或昵称 → 该条详情页 -->
   <view class="feed">
 
     <block wx:if="{{viewState === 'loading'}}">
@@ -56,7 +56,12 @@
         <view class="moment-body">
           <text class="moment-name" data-uid="{{item.uid}}" bindtap="openDetail">{{profile.name}}</text>
 
-          <view wx:if="{{item.content}}" class="moment-text {{item.folded ? 'is-folded' : ''}}"><text>{{item.content}}</text></view>
+          <!-- 只有「需要折叠且当前仍折叠」的长文本才用普通 text 保证 line-clamp 生效；
+               短文本、以及点开全文后的长文本都可选中复制 -->
+          <view wx:if="{{item.content}}" class="moment-text {{item.needFold && item.folded ? 'is-folded' : ''}}">
+            <text wx:if="{{item.needFold && item.folded}}">{{item.content}}</text>
+            <text wx:else class="text-selectable" user-select="{{true}}">{{item.content}}</text>
+          </view>
           <view wx:if="{{item.needFold}}" class="fold-btn" data-index="{{mIndex}}" bindtap="toggleFold">{{item.folded ? '全文' : '收起'}}</view>
 
           <!-- 九宫格：1 图自然比例 / 2、4 图两列 / 其余三列，最多显示 9 张 -->
@@ -76,14 +81,20 @@
           <!-- 视频 / 音频 / 其它附件：内容展示，不提供跳转或下载入口 -->
           <view wx:for="{{item.extras}}" wx:for-item="extra" wx:key="url" class="extra">
             <video wx:if="{{extra.kind === 'video'}}" class="extra-video" src="{{extra.url}}"
-                   controls="{{true}}" object-fit="contain" show-center-play-btn="{{true}}"
-                   enable-play-gesture="{{false}}"></video>
+                   poster="{{extra.poster}}" controls="{{true}}" object-fit="contain"
+                   show-center-play-btn="{{true}}" enable-play-gesture="{{false}}"></video>
 
             <view wx:elif="{{extra.kind === 'audio'}}" class="extra-card" data-url="{{extra.url}}" bindtap="onToggleAudio">
               <view class="audio-play"><text class="audio-icon">{{playingKey === extra.url ? 'Ⅱ' : '▶'}}</text></view>
               <view class="extra-main">
                 <text class="extra-name">{{extra.name}}</text>
-                <text wx:if="{{extra.sizeText}}" class="extra-size">{{extra.sizeText}}</text>
+                <view wx:if="{{playingKey === extra.url}}" class="audio-progress">
+                  <view class="audio-track"><view class="audio-fill" style="width:{{audioProgress}}%"></view></view>
+                </view>
+                <view class="audio-meta">
+                  <text class="extra-size">{{extra.sizeText}}</text>
+                  <text wx:if="{{playingKey === extra.url}}" class="audio-time">{{audioTimeText}}</text>
+                </view>
               </view>
             </view>
 

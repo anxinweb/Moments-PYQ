@@ -17,6 +17,7 @@ Page({
     coverHeight: 300,
     navSolid: false,
     showTop: false,
+    fontPx: '16px',
 
     profile: { name: CONFIG.NICKNAME, avatar: '' },
     coverUrl: CONFIG.COVER_URL,
@@ -31,6 +32,8 @@ Page({
     loadError: false,
     done: false,
     playingKey: '',
+    audioProgress: 0,
+    audioTimeText: '0:00',
 
     cell3Px: '90px',
     cell2Px: '140px',
@@ -52,9 +55,12 @@ Page({
     const coverHeight = Math.min(380, Math.max(240, Math.round(height * 0.46)));
 
     this.audioCtx = null;
+    this.lastAudioSec = -1;
+    this.audioDurationSec = 0;
     this.setData({
       statusBarHeight: sys.statusBarHeight || 20,
       coverHeight: coverHeight,
+      fontPx: (16 * fmt.fontScale()).toFixed(1) + 'px',
       cell3Px: cell3 + 'px',
       cell2Px: cell2 + 'px',
       grid2WidthPx: grid2W + 'px',
@@ -65,7 +71,7 @@ Page({
 
   onHide: function () {
     this.destroyAudio();
-    this.setData({ playingKey: '' });
+    this.setData({ playingKey: '', audioProgress: 0, audioTimeText: '0:00' });
   },
 
   onUnload: function () {
@@ -100,7 +106,14 @@ Page({
       if (callback) callback();
     };
     this.destroyAudio();
-    this.setData({ viewState: 'loading', loadError: false, playingKey: '', showTop: false });
+    this.setData({
+      viewState: 'loading',
+      loadError: false,
+      showTop: false,
+      playingKey: '',
+      audioProgress: 0,
+      audioTimeText: '0:00',
+    });
 
     Promise.all([
       getProfile().catch(function () { return null; }),
@@ -177,7 +190,9 @@ Page({
       uid: String(memo.name || '').split('/')[1] || String(memo.name || ''),
       content: content,
       needFold: needFold,
-      folded: true,
+      // 只有真正会被截断的长文本才默认折叠；短文本直接展开并可长按复制，
+      // 否则短文本既没有「全文」按钮又拿不到 user-select，会永远无法复制
+      folded: needFold,
       timeText: fmt.timeText(memo.createTime),
       images: images,
       // +N 折叠的图片也能在预览里左右滑到，与微信一致
@@ -229,12 +244,13 @@ Page({
     this.setData({ 'profile.avatar': '' });
   },
 
+  /** 音频播放：同时维护互斥播放、时长、当前时间与进度条 */
   onToggleAudio: function (e) {
     const url = e.currentTarget.dataset.url;
     if (!url) return;
     if (this.data.playingKey === url) {
       if (this.audioCtx) this.audioCtx.pause();
-      this.setData({ playingKey: '' });
+      this.setData({ playingKey: '', audioProgress: 0, audioTimeText: '0:00' });
       return;
     }
     if (!wx.createInnerAudioContext) {
@@ -244,11 +260,33 @@ Page({
     this.destroyAudio();
     const ctx = wx.createInnerAudioContext();
     ctx.src = url;
-    ctx.onEnded(function () { this.setData({ playingKey: '' }); }.bind(this));
-    ctx.onError(function () { this.setData({ playingKey: '' }); }.bind(this));
+    this.lastAudioSec = -1;
+    this.audioDurationSec = 0;
+    ctx.onCanplay(function () {
+      this.audioDurationSec = Number(ctx.duration) || 0;
+      this.setData({ audioTimeText: '0:00 / ' + fmt.clockText(this.audioDurationSec) });
+    }.bind(this));
+    ctx.onTimeUpdate(function () {
+      const cur = Number(ctx.currentTime) || 0;
+      const sec = Math.floor(cur);
+      if (sec === this.lastAudioSec) return; // 每秒最多刷新一次
+      this.lastAudioSec = sec;
+      const dur = this.audioDurationSec || Number(ctx.duration) || 0;
+      this.setData({
+        audioTimeText: fmt.clockText(cur) + ' / ' + fmt.clockText(dur),
+        audioProgress: dur ? Math.min(100, Math.round((cur / dur) * 100)) : 0,
+      });
+    }.bind(this));
+    ctx.onEnded(function () { this.resetAudioState(); }.bind(this));
+    ctx.onError(function () { this.resetAudioState(); }.bind(this));
     ctx.play();
     this.audioCtx = ctx;
-    this.setData({ playingKey: url });
+    this.setData({ playingKey: url, audioProgress: 0, audioTimeText: '0:00 / --:--' });
+  },
+
+  resetAudioState: function () {
+    this.destroyAudio();
+    this.setData({ playingKey: '', audioProgress: 0, audioTimeText: '0:00' });
   },
 
   destroyAudio: function () {

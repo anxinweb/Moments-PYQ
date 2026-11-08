@@ -38,6 +38,12 @@ const CONFIG = {
   // 详情页分享链接前缀，与网页版 ?memo=<uid> 一致
   SHARE_BASE: 'https://pyq.ahxin.cn/?memo=',
 
+  // 纯文字动态的转发卡片封面：用已在 downloadFile 白名单内的站长头像
+  FALLBACK_SHARE_IMAGE: 'https://memos.ahxin.cn/file/users/ahxin/avatar',
+
+  // 版本号（资料页底部极淡展示，改这里即可）
+  VERSION: '1.0.2',
+
   REQUEST_TIMEOUT: 12000,
 };
 

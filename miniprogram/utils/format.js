@@ -61,6 +61,45 @@ function timeText(iso) {
     : dt.getFullYear() + '年' + md;
 }
 
+/** 秒 → m:ss（音频进度 / 时长） */
+function clockText(sec) {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+}
+
+/** 转发卡片标题：跳过空行、分割线、纯符号行，取第一条有效正文 */
+function shareTitle(content, fallback) {
+  const lines = String(content || '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i]
+      .replace(/^[\s·☐☑]+/, '')
+      .replace(/^─+/, '')
+      .trim();
+    if (t && !/^[─—\-=*_\s.。、，,]+$/.test(t)) return t.slice(0, 40);
+  }
+  return fallback || '';
+}
+
+/** 用户微信字体大小设置 → 缩放系数；取不到或非预期值返回 1 */
+function fontScale() {
+  function from(sys) {
+    if (!sys) return 0;
+    const f = Number(sys.fontSizeScaleFactor);
+    if (f > 0.7 && f < 1.6) return f;
+    const s = Number(sys.fontSizeSetting);
+    if (s >= 12 && s <= 24) return s / 16;
+    return 0;
+  }
+  let f = 0;
+  try {
+    if (wx.getAppBaseInfo) f = from(wx.getAppBaseInfo());
+  } catch (e) { /* ignore */ }
+  if (!f) {
+    try { f = from(wx.getSystemInfoSync()); } catch (e) { /* ignore */ }
+  }
+  return f ? Math.round(f * 100) / 100 : 1;
+}
+
 /** Markdown 精简为朋友圈可接受的纯文本：无标题、无标签、无可点链接、无代码块样式 */
 function renderContent(raw, opts) {
   const hideTags = !opts || opts.hideTags !== false;
@@ -146,6 +185,7 @@ function prettyMediaName(name) {
 function mediaOf(memo) {
   const images = [];
   const extras = [];
+  const videoItems = [];
   (memo.attachments || []).forEach(function (a) {
     const type = a.type || '';
     const url = attachmentUrl(a);
@@ -154,12 +194,18 @@ function mediaOf(memo) {
     if (type.indexOf('image/') === 0) {
       images.push({ url: url, thumb: thumbUrl(url), name: name });
     } else if (type.indexOf('video/') === 0) {
-      extras.push({ kind: 'video', url: url, name: prettyMediaName(name), sizeText: sizeText });
+      // Memos 不生成配套封面帧：同条动态有图片时用首图作 poster，否则保持原生播放按钮
+      const item = { kind: 'video', url: url, name: prettyMediaName(name), sizeText: sizeText, poster: '' };
+      videoItems.push(item);
+      extras.push(item);
     } else if (type.indexOf('audio/') === 0) {
-      extras.push({ kind: 'audio', url: url, name: name || '音频', sizeText: sizeText });
+      extras.push({ kind: 'audio', url: url, name: name || '音频', sizeText: sizeText, poster: '' });
     } else {
-      extras.push({ kind: 'file', url: url, name: name || '附件', sizeText: sizeText });
+      extras.push({ kind: 'file', url: url, name: name || '附件', sizeText: sizeText, poster: '' });
     }
+  });
+  videoItems.forEach(function (v) {
+    if (images.length) v.poster = images[0].url;
   });
   return { images: images, extras: extras };
 }
@@ -167,6 +213,9 @@ function mediaOf(memo) {
 module.exports = {
   parseTime: parseTime,
   timeText: timeText,
+  clockText: clockText,
+  shareTitle: shareTitle,
+  fontScale: fontScale,
   renderContent: renderContent,
   mediaOf: mediaOf,
   bytesText: bytesText,

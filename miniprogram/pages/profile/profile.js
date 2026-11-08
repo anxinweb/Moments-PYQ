@@ -4,11 +4,14 @@
  */
 const { CONFIG } = require('../../utils/config.js');
 const { getProfile } = require('../../utils/api.js');
+const fmt = require('../../utils/format.js');
 
 Page({
   data: {
     statusBarHeight: 20,
     contentTop: 64,
+    fontPx: '16px',
+    version: CONFIG.VERSION,
     profile: { name: CONFIG.NICKNAME, avatar: '', bio: '' },
     links: [
       { key: 'memos', label: 'Memos 主页', url: CONFIG.MEMOS_HOME },
@@ -19,7 +22,11 @@ Page({
   onLoad: function () {
     const sys = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
     const bar = sys.statusBarHeight || 20;
-    this.setData({ statusBarHeight: bar, contentTop: bar + 44 + 24 });
+    this.setData({
+      statusBarHeight: bar,
+      contentTop: bar + 44 + 24,
+      fontPx: (16 * fmt.fontScale()).toFixed(1) + 'px',
+    });
     getProfile()
       .then(function (p) { this.setData({ profile: p }); }.bind(this))
       .catch(function () { /* 保留兜底资料 */ });

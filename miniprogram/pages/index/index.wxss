@@ -169,6 +169,12 @@
     overflow: hidden;
 }
 
+/* 可选中正文：user-select 会把 text 变成 inline-block，短文本热区只有几个字宽；
+   改成块级让整行都能触发长按，不影响换行与排版（详情页 @import 后同样生效） */
+.text-selectable {
+    display: block;
+}
+
 .fold-btn {
     display: inline-block;
     margin-top: 4px;
@@ -452,4 +458,49 @@
     display: block;
     width: 22px;
     height: 22px;
+}
+
+/* ---------------------------------------------------------------- 字号跟随微信字体设置
+   根节点 font-size 由页面 JS 注入（默认 16px），主要阅读文字改用 em 等比缩放；
+   默认状态下这些值与原先的 px 完全一致，不改变已确认的视觉 */
+.moment-name { font-size: 0.9375em; }
+.moment-text { font-size: 1em; }
+.fold-btn { font-size: 1em; }
+.moment-time { font-size: 0.8125em; }
+.extra-name { font-size: 0.8125em; }
+
+/* 无封面帧时给视频一个柔和的深色底，避免纯黑块 */
+.extra-video {
+    background: linear-gradient(160deg, #2b2b2b 0%, #151515 100%);
+}
+
+/* 音频播放进度 */
+.audio-progress {
+    margin-top: 6px;
+}
+
+.audio-track {
+    height: 3px;
+    border-radius: 2px;
+    background: #e2e2e2;
+    overflow: hidden;
+}
+
+.audio-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: #576b95;
+    transition: width 0.2s linear;
+}
+
+.audio-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+}
+
+.audio-time {
+    font-size: 12px;
+    color: #b2b2b2;
 }

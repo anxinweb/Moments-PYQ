@@ -158,9 +158,22 @@ function prettyMediaName(name) {
 
 function videoHtml(v) {
   const vname = prettyMediaName(v.name);
+  // 视频封面：优先用本地抽好的静态帧（CONFIG.VIDEO_POSTERS），日常浏览零视频流量；
+  // 没配封面的视频显示黑色占位，同样等点播放才加载视频
+  // 附件 id 从 URL 提取：.../attachments/<id>/<filename>
+  const m = (v.url || '').match(/\/attachments\/([^/]+)\//);
+  const id = m ? m[1] : '';
+  const poster = (CONFIG.VIDEO_POSTERS || {})[id];
   return (
-    `<div class="media media-video">` +
-    `<video src="${v.url}" controls playsinline preload="metadata" data-media></video>` +
+    `<div class="media media-video" data-video-box>` +
+    `<div class="video-frame">` +
+    (poster
+      ? `<img class="video-poster" src="${poster}" alt="" loading="lazy" decoding="async">`
+      : `<div class="video-poster video-poster-empty"></div>`) +
+    `<button type="button" class="video-play" aria-label="播放视频" data-video-url="${v.url}">` +
+    `<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.7-6.8c.6-.4.6-1.4 0-1.8L9.6 4.3c-.7-.4-1.6.1-1.6.9z"/></svg>` +
+    `</button>` +
+    `</div>` +
     `<a class="media-caption" href="${v.url}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(vname)}">` +
     `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.6v12.8l10-6.4z"></path></svg>` +
     `<span class="media-caption-name">${escapeHtml(vname || '视频')}</span>` +

@@ -15,6 +15,7 @@ Page({
   data: {
     statusBarHeight: 20,
     contentTop: 64,
+    fontPx: '16px',
     uid: '',
     shareUrl: '',
     shareImage: '',
@@ -22,6 +23,8 @@ Page({
     viewState: 'loading',
     moment: null,
     playingKey: '',
+    audioProgress: 0,
+    audioTimeText: '0:00',
     shareMenuOpen: false,
 
     cell3Px: '90px',
@@ -42,11 +45,14 @@ Page({
     const singleW = Math.max(120, Math.min(Math.floor(contentW * 0.66), 208));
 
     this.audioCtx = null;
+    this.lastAudioSec = -1;
+    this.audioDurationSec = 0;
     this.setData({
       uid: uid,
       shareUrl: CONFIG.SHARE_BASE + uid,
       statusBarHeight: bar,
       contentTop: bar + 44 + 12,
+      fontPx: (16 * fmt.fontScale()).toFixed(1) + 'px',
       cell3Px: cell3 + 'px',
       cell2Px: cell2 + 'px',
       grid2WidthPx: grid2W + 'px',
@@ -57,7 +63,7 @@ Page({
 
   onHide: function () {
     this.destroyAudio();
-    this.setData({ playingKey: '', shareMenuOpen: false });
+    this.setData({ playingKey: '', audioProgress: 0, audioTimeText: '0:00', shareMenuOpen: false });
   },
 
   onUnload: function () {
@@ -80,7 +86,8 @@ Page({
         if (results[0]) patch.profile = results[0];
         const m = this.buildMoment(results[1]);
         patch.moment = m;
-        patch.shareImage = m.allOrigins.length ? m.allOrigins[0] : '';
+        // 纯文字动态也有卡片封面：回退到已在白名单内的站长头像
+        patch.shareImage = m.allOrigins.length ? m.allOrigins[0] : CONFIG.FALLBACK_SHARE_IMAGE;
         this.setData(patch);
       }.bind(this))
       .catch(function () {
@@ -141,12 +148,13 @@ Page({
     this.setData({ 'profile.avatar': '' });
   },
 
+  /** 音频播放：互斥、时长、当前时间与进度条 */
   onToggleAudio: function (e) {
     const url = e.currentTarget.dataset.url;
     if (!url) return;
     if (this.data.playingKey === url) {
       if (this.audioCtx) this.audioCtx.pause();
-      this.setData({ playingKey: '' });
+      this.setData({ playingKey: '', audioProgress: 0, audioTimeText: '0:00' });
       return;
     }
     if (!wx.createInnerAudioContext) {
@@ -156,11 +164,33 @@ Page({
     this.destroyAudio();
     const ctx = wx.createInnerAudioContext();
     ctx.src = url;
-    ctx.onEnded(function () { this.setData({ playingKey: '' }); }.bind(this));
-    ctx.onError(function () { this.setData({ playingKey: '' }); }.bind(this));
+    this.lastAudioSec = -1;
+    this.audioDurationSec = 0;
+    ctx.onCanplay(function () {
+      this.audioDurationSec = Number(ctx.duration) || 0;
+      this.setData({ audioTimeText: '0:00 / ' + fmt.clockText(this.audioDurationSec) });
+    }.bind(this));
+    ctx.onTimeUpdate(function () {
+      const cur = Number(ctx.currentTime) || 0;
+      const sec = Math.floor(cur);
+      if (sec === this.lastAudioSec) return;
+      this.lastAudioSec = sec;
+      const dur = this.audioDurationSec || Number(ctx.duration) || 0;
+      this.setData({
+        audioTimeText: fmt.clockText(cur) + ' / ' + fmt.clockText(dur),
+        audioProgress: dur ? Math.min(100, Math.round((cur / dur) * 100)) : 0,
+      });
+    }.bind(this));
+    ctx.onEnded(function () { this.resetAudioState(); }.bind(this));
+    ctx.onError(function () { this.resetAudioState(); }.bind(this));
     ctx.play();
     this.audioCtx = ctx;
-    this.setData({ playingKey: url });
+    this.setData({ playingKey: url, audioProgress: 0, audioTimeText: '0:00 / --:--' });
+  },
+
+  resetAudioState: function () {
+    this.destroyAudio();
+    this.setData({ playingKey: '', audioProgress: 0, audioTimeText: '0:00' });
   },
 
   destroyAudio: function () {
@@ -203,12 +233,11 @@ Page({
     this.load();
   },
 
-  /** 转发给微信好友：好友点开直达本条详情（path 带 uid，可冷启动） */
+  /** 转发给微信好友：标题跳过分割线/空行，好友点开直达本条详情 */
   onShareAppMessage: function () {
     const m = this.data.moment;
-    const firstLine = m && m.content ? m.content.split('\n')[0].replace(/^[\s·]+/, '') : '';
     const res = {
-      title: (firstLine || '').slice(0, 40) || CONFIG.SITE_TITLE,
+      title: fmt.shareTitle(m && m.content, CONFIG.SITE_TITLE),
       path: '/pages/detail/detail?uid=' + this.data.uid,
     };
     if (this.data.shareImage) res.imageUrl = this.data.shareImage;
