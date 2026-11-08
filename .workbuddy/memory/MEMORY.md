@@ -13,7 +13,7 @@
 - feed 需按 creator==users/ahxin 过滤；CORS 仅放行 pyq.ahxin.cn → 同源 Edge 代理
 - 仓库 anxinweb/Moments-PYQ：GitHub MCP unauthorized，用本地 git push；远端 main 分支 2026-11-08 重建过
 - **弱网兜底**（v20261109f）：所有 GET 走 api.js `getJSON`（统一 10s 超时 + 自动重试 1 次），新增请求别绕过它；首屏 6s 无数据弹 .feed-note「网络有点慢」+ 重载，失败显示失败态而非空白；封面 setCover 需 complete 兜底（iOS 缓存命中可能不触发 load）
-- **视频封面**（v20261109g）：视频动态=静态封面帧+播放按钮，点播放才加载视频（零流量）；封面图 assets/video-poster-<附件id>.jpg 由 .preview/make-video-poster.mjs 抽帧；映射在 config.js VIDEO_POSTERS（附件 id 从 v.url 正则提取，mediaOf 已把 name 重写为 filename 不能用）
+- **视频动态**（v20261109h，用户拍板）：**不做封面**，直接嵌 `<video controls preload="metadata">`（黑块可接受）；20261109g 的静态封面帧方案已整套撤掉（config VIDEO_POSTERS / assets/video-poster-* / .video-* 样式 / 播放委托），别再自作主张加回来。若将来要自动封面：memos 文件服务有 CORS 且支持 Range，跨域 canvas 抽帧可行，首帧约 1MB/视频
 
 ## 当前方案（用户拍板）
 - 评论存 Memos（令牌在 Vercel MEMOS_TOKEN，**待用户换成主号令牌**），可见性=审核开关（PRIVATE=待审，PUBLIC=过审）

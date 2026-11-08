@@ -1696,6 +1696,15 @@ async function boot() {
     if (e.key === 'Escape') closePopover();
   });
 
+  // 视频只给看不给下：右键（桌面）/长按（部分安卓）不弹「视频另存为」菜单
+  document.addEventListener(
+    'contextmenu',
+    (e) => {
+      if (e.target.closest('video')) e.preventDefault();
+    },
+    { capture: true }
+  );
+
   // 资料与首屏动态并行请求
   const cachedProfile = readCachedProfile();
   if (cachedProfile) applyProfile(cachedProfile); // 昵称/头像先用缓存，不用等接口

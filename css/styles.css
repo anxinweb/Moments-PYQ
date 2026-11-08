@@ -513,6 +513,11 @@ a {
   max-height: 62vh;
   border-radius: 4px;
   background: #000;
+  /* 只给看不给下：长按不出「存储/下载」菜单，也不能拖拽保存 */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .media-caption {

@@ -148,24 +148,14 @@ function bytesText(n) {
   return (n / 1024 / 1024).toFixed(1) + ' MB';
 }
 
-/** Memos 转码视频的文件名是 video_xxx_0_2.mp4，展示时还原成原视频名 */
-function prettyMediaName(name) {
-  if (!name) return '';
-  if (!name.startsWith('video_')) return name;
-  const stripped = name.replace(/^video_/, '').replace(/_\d+_\d+(\.[a-z0-9]+)$/i, '$1');
-  return stripped || name;
-}
-
 function videoHtml(v) {
-  const vname = prettyMediaName(v.name);
+  // 只给看不给下：不出现文件名跳转链接、隐藏播放器里的下载按钮、禁右键/长按菜单、
+  // 禁画中画与投屏（这些都会给出「保存视频」的入口）
   return (
     `<div class="media media-video">` +
-    `<video src="${v.url}" controls playsinline preload="metadata" data-media></video>` +
-    `<a class="media-caption" href="${v.url}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(vname)}">` +
-    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.6v12.8l10-6.4z"></path></svg>` +
-    `<span class="media-caption-name">${escapeHtml(vname || '视频')}</span>` +
-    (v.size ? `<span class="media-caption-size">${bytesText(v.size)}</span>` : '') +
-    `</a>` +
+    `<video src="${v.url}" controls playsinline preload="metadata" ` +
+    `controlslist="nodownload noremoteplayback" disablepictureinpicture ` +
+    `disableremoteplayback oncontextmenu="return false"></video>` +
     `</div>`
   );
 }
