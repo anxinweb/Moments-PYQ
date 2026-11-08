@@ -346,7 +346,7 @@ function commentItemHtml(c, isReply) {
 }
 
 /** 微信样式的赞/评论灰底框：♥ 昵称们 + 两级评论「昵称：内容」/「昵称 回复@某某：内容」 */
-/** 评论折叠阈值：一级评论超过这个数就收起，只显示最新的几条 */
+/** 评论折叠阈值：一级评论超过这个数就收起，与微信一致只显示最早的几条 */
 const COMMENT_FOLD = 5;
 
 /** 微信样式的赞/评论灰底框：♥ 昵称们 + 评论列表（超过 5 条折叠） */
@@ -355,17 +355,17 @@ export function drawerHtml(likes, comments, opts = {}) {
   const list = comments || [];
   if (!hasLikes && !list.length) return '';
 
-  // 折叠：未展开时显示最新的 COMMENT_FOLD 条（「审核中」条目无论多旧都追加显示，
-  // 避免评论者自己刚发的被藏起来）；展开后显示全部 + 收起按钮
+  // 折叠（对齐微信）：未展开时显示最早的 COMMENT_FOLD 条，按时间正序从上到下排，
+  // 剩下的收进「查看全部」；「审核中」条目无论如何都追加显示，避免评论者自己刚发的被藏起来
   const foldable = list.length > COMMENT_FOLD && !opts.noFold;
   let visible = list;
   let foldBtn = '';
   if (foldable && !opts.expanded) {
-    const tail = list.slice(-COMMENT_FOLD);
-    const seen = new Set(tail);
+    const head = list.slice(0, COMMENT_FOLD);
+    const seen = new Set(head);
     const pendingExtra = list.filter((c) => c.pending && !seen.has(c));
-    visible = pendingExtra.length ? tail.concat(pendingExtra) : tail;
-    foldBtn = `<button class="drawer-fold" type="button">查看全部 ${list.length} 条评论 ›</button>`;
+    visible = pendingExtra.length ? head.concat(pendingExtra) : head;
+    foldBtn = `<button class="drawer-fold" type="button">查看全部 ${list.length} 条评论</button>`;
   } else if (foldable && opts.expanded) {
     foldBtn = `<button class="drawer-fold is-collapse" type="button">收起</button>`;
   }
