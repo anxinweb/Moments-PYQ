@@ -1518,9 +1518,9 @@ async function loadDetailView(uid) {
   // 否则弱网下要等资料接口，页面会空好几秒
   const cachedProfile = readCachedProfile();
   if (cachedProfile) applyProfile(cachedProfile);
-  el.feed.innerHTML = skeletonHtml(1);
-  try {
-    const memo = await getMemo(uid);
+
+  /** 把一条 memo 渲染成详情页 */
+  const paint = (memo) => {
     el.feed.innerHTML = '';
     const frag = document.createElement('div');
     frag.innerHTML = renderMoment(memo, state.profile, { folded: false });
@@ -1537,9 +1537,24 @@ async function loadDetailView(uid) {
       if (nameEl && p && p.name) nameEl.textContent = p.name;
     });
     onScroll();
+  };
+
+  // 先用手上已有的首页快照垫上 → 点昵称进详情几乎零等待，再后台拉最新
+  const cached = (readSnapshot()?.memos || []).find(
+    (m) => (m.name || '').split('/')[1] === uid
+  );
+  if (cached) paint(cached);
+  else el.feed.innerHTML = skeletonHtml(1);
+
+  try {
+    const memo = await getMemo(uid);
+    if (!cached) paint(memo);
+    // 快照内容与服务器不一致（刚编辑过/附件变了）才重绘
+    else if ((memo.content || '') !== (cached.content || '')) paint(memo);
   } catch (err) {
     console.error('[memo]', err);
-    el.feed.innerHTML = '<p class="empty">这条动态不存在，或已设为不可见</p>';
+    // 已经有快照内容就保留（可能只是接口抖动），否则给明确提示
+    if (!cached) el.feed.innerHTML = '<p class="empty">这条动态不存在，或已设为不可见</p>';
   }
 }
 
