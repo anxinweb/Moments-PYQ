@@ -60,4 +60,17 @@ function getMemos(pageToken) {
   });
 }
 
-module.exports = { getProfile: getProfile, getMemos: getMemos };
+/** 单条动态（详情页 / 分享卡片冷启动）：仅本站作者的公开发布内容 */
+function getMemo(uid) {
+  const safe = String(uid || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safe) return Promise.reject(new Error('invalid_uid'));
+  return getJSON(CONFIG.API_BASE + '/memo?uid=' + encodeURIComponent(safe)).then(function (data) {
+    const memo = data && data.memo;
+    if (!memo || memo.state === 'ARCHIVED' || memo.creator !== 'users/' + CONFIG.ADMIN_USER) {
+      throw new Error('not_found');
+    }
+    return memo;
+  });
+}
+
+module.exports = { getProfile: getProfile, getMemos: getMemos, getMemo: getMemo };

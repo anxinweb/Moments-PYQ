@@ -1,6 +1,8 @@
 {
   "pages": [
-    "pages/index/index"
+    "pages/index/index",
+    "pages/profile/profile",
+    "pages/detail/detail"
   ],
   "window": {
     "navigationBarTitleText": "朋友圈",

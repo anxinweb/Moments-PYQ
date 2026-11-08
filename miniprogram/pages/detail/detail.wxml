@@ -1,0 +1,89 @@
+<view class="page">
+  <view class="sub-nav" style="padding-top:{{statusBarHeight}}px">
+    <view class="sub-nav-inner">
+      <view class="sub-nav-back" bindtap="goBack"><text class="sub-nav-back-icon">‹</text></view>
+      <text class="sub-nav-title">详情</text>
+    </view>
+  </view>
+
+  <view class="content" style="padding-top:{{contentTop}}px">
+
+    <block wx:if="{{viewState === 'loading'}}">
+      <view class="skeleton">
+        <view class="sk sk-avatar"></view>
+        <view class="sk-main">
+          <view class="sk sk-line" style="width:30%"></view>
+          <view class="sk sk-line" style="width:88%"></view>
+          <view class="sk sk-line" style="width:64%"></view>
+          <view class="sk sk-block"></view>
+        </view>
+      </view>
+    </block>
+
+    <view wx:elif="{{viewState === 'error'}}" class="state">
+      <text class="state-text">内容加载失败或已不存在</text>
+      <view class="retry" bindtap="onRetry">重新加载</view>
+    </view>
+
+    <block wx:else>
+      <view class="moment">
+        <view class="avatar-wrap">
+          <image wx:if="{{profile.avatar}}" class="moment-avatar" src="{{profile.avatar}}" mode="aspectFill" binderror="onAvatarError"></image>
+          <view wx:else class="moment-avatar moment-avatar-fallback"></view>
+        </view>
+
+        <view class="moment-body">
+          <text class="moment-name">{{profile.name}}</text>
+          <view wx:if="{{moment.content}}" class="moment-text"><text>{{moment.content}}</text></view>
+
+          <view wx:if="{{moment.images.length}}" class="grid grid-{{moment.gridType}}" style="{{moment.gridStyle}}">
+            <view class="cell"
+                  wx:for="{{moment.images}}" wx:for-item="img" wx:for-index="imgIndex" wx:key="origin"
+                  style="{{moment.gridType === 1 ? moment.singleStyle : moment.cellStyle}}"
+                  data-index="{{imgIndex}}" bindtap="onPreviewImage">
+              <image class="cell-img" src="{{img.thumb}}"
+                     mode="{{moment.gridType === 1 ? 'widthFix' : 'aspectFill'}}"
+                     data-index="{{imgIndex}}" binderror="onImageError"></image>
+              <view wx:if="{{img.more}}" class="cell-more"><text>+{{img.moreCount}}</text></view>
+            </view>
+          </view>
+
+          <view wx:for="{{moment.extras}}" wx:for-item="extra" wx:key="url" class="extra">
+            <video wx:if="{{extra.kind === 'video'}}" class="extra-video" src="{{extra.url}}"
+                   controls="{{true}}" object-fit="contain" show-center-play-btn="{{true}}"
+                   enable-play-gesture="{{false}}"></video>
+
+            <view wx:elif="{{extra.kind === 'audio'}}" class="extra-card" data-url="{{extra.url}}" bindtap="onToggleAudio">
+              <view class="audio-play"><text class="audio-icon">{{playingKey === extra.url ? 'Ⅱ' : '▶'}}</text></view>
+              <view class="extra-main">
+                <text class="extra-name">{{extra.name}}</text>
+                <text wx:if="{{extra.sizeText}}" class="extra-size">{{extra.sizeText}}</text>
+              </view>
+            </view>
+
+            <view wx:else class="extra-card extra-card-static">
+              <text class="extra-file-icon">▤</text>
+              <view class="extra-main">
+                <text class="extra-name">{{extra.name}}</text>
+                <text wx:if="{{extra.sizeText}}" class="extra-size">{{extra.sizeText}}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="meta"><text class="moment-time">{{moment.timeText}}</text></view>
+        </view>
+      </view>
+
+      <view class="share-section">
+        <text class="section-label">分享</text>
+        <view class="share-card" bindtap="onCopyShare">
+          <text class="share-url">{{shareUrl}}</text>
+          <text class="share-copy">复制链接</text>
+        </view>
+        <button class="share-btn" open-type="share">分享给微信好友</button>
+        <text class="hint">复制的链接在浏览器打开是网页版详情页；转发给好友会直接打开小程序内的这条动态。</text>
+      </view>
+    </block>
+
+  </view>
+</view>

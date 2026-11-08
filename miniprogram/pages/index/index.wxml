@@ -1,17 +1,17 @@
 <view class="app">
 
-  <!-- 沉浸式自定义导航：只有标题，没有任何按钮 / 入口 -->
+  <!-- 沉浸式自定义导航：只有标题；转发由右上角「…」菜单触发 -->
   <view class="nav {{navSolid ? 'is-solid' : ''}}" style="padding-top:{{statusBarHeight}}px">
     <view class="nav-inner">
       <text class="nav-title">朋友圈</text>
     </view>
   </view>
 
-  <!-- 封面 -->
+  <!-- 封面：点头像或昵称 → 资料页 -->
   <view class="cover" style="height:{{coverHeight}}px">
-    <image class="cover-img" src="{{coverUrl}}" mode="aspectFill"></image>
+    <image class="cover-img" src="{{coverUrl}}" mode="{{coverMode}}"></image>
     <view class="cover-mask"></view>
-    <view class="cover-user">
+    <view class="cover-user" bindtap="openProfile">
       <text class="cover-name">{{profile.name}}</text>
       <view class="cover-avatar-wrap">
         <image wx:if="{{profile.avatar}}" class="cover-avatar" src="{{profile.avatar}}" mode="aspectFill" binderror="onAvatarError"></image>
@@ -20,7 +20,7 @@
     </view>
   </view>
 
-  <!-- 信息流 -->
+  <!-- 信息流：点头像或昵称 → 该条详情页；正文与媒体不可点 -->
   <view class="feed">
 
     <block wx:if="{{viewState === 'loading'}}">
@@ -48,13 +48,13 @@
       <view class="moment {{mIndex > 0 ? 'has-line' : ''}}"
             wx:for="{{moments}}" wx:for-index="mIndex" wx:key="uid">
 
-        <view class="avatar-wrap">
+        <view class="avatar-wrap" data-uid="{{item.uid}}" bindtap="openDetail">
           <image wx:if="{{profile.avatar}}" class="moment-avatar" src="{{profile.avatar}}" mode="aspectFill" binderror="onAvatarError"></image>
           <view wx:else class="moment-avatar moment-avatar-fallback"></view>
         </view>
 
         <view class="moment-body">
-          <text class="moment-name">{{profile.name}}</text>
+          <text class="moment-name" data-uid="{{item.uid}}" bindtap="openDetail">{{profile.name}}</text>
 
           <view wx:if="{{item.content}}" class="moment-text {{item.folded ? 'is-folded' : ''}}"><text>{{item.content}}</text></view>
           <view wx:if="{{item.needFold}}" class="fold-btn" data-index="{{mIndex}}" bindtap="toggleFold">{{item.folded ? '全文' : '收起'}}</view>

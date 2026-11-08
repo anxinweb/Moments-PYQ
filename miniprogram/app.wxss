@@ -14,3 +14,66 @@ image,
 video {
     box-sizing: border-box;
 }
+
+/* 子页面通用导航与状态样式（用 .sub-* 前缀，避免与首页 .nav 互相覆盖） */
+.sub-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 30;
+    background: rgba(237, 237, 237, 0.94);
+    border-bottom: 0.5px solid #e6e6e6;
+    color: #191919;
+}
+
+.sub-nav-inner {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px;
+}
+
+.sub-nav-title {
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+.sub-nav-back {
+    position: absolute;
+    left: 6px;
+    top: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sub-nav-back-icon {
+    font-size: 30px;
+    line-height: 1;
+    color: #191919;
+}
+
+.state {
+    padding: 70px 20px;
+    text-align: center;
+}
+
+.state-text {
+    font-size: 14px;
+    color: #7f7f7f;
+}
+
+.retry {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 8px 18px;
+    border: 0.5px solid #e6e6e6;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #576b95;
+}

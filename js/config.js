@@ -30,7 +30,7 @@ export const CONFIG = {
    */
   COVER: {
     MODE: 'fixed',
-    URL: '/assets/cover.jpg',
+    URL: '/assets/cover.jpg?v=20261108',
     MOBILE_POS: '50% 50%',
     DESKTOP_POS: '50% 45%',
   },

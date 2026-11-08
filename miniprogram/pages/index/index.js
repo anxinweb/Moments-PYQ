@@ -1,7 +1,8 @@
 /**
- * 朋友圈 · 纯展示页
- * 只做三件事：拉公开内容、按微信朋友圈排版渲染、点图看大图。
- * 不含评论 / 点赞 / 详情跳转 / 外链 / 分享 / 登录等任何入口。
+ * 朋友圈 · 展示页
+ * 拉公开内容、按微信朋友圈排版渲染、点图看大图。
+ * 入口：封面头像/昵称 → 资料页；信息流头像/昵称 → 详情页；右上角菜单可转发。
+ * 仍然没有评论、点赞、外链跳转、登录与令牌。
  */
 const { CONFIG } = require('../../utils/config.js');
 const { getProfile, getMemos } = require('../../utils/api.js');
@@ -17,6 +18,7 @@ Page({
 
     profile: { name: CONFIG.NICKNAME, avatar: '' },
     coverUrl: CONFIG.COVER_URL,
+    coverMode: CONFIG.COVER_MODE,
 
     // loading | ready | empty | error
     viewState: 'loading',
@@ -258,5 +260,27 @@ Page({
 
   onRetryMore: function () {
     this.loadMore();
+  },
+
+  /* ------------------------------------------------------------ 页面入口与转发 */
+
+  /** 封面头像 / 昵称 → 资料页（Memos 与朋友圈链接，仅可复制） */
+  openProfile: function () {
+    wx.navigateTo({ url: '/pages/profile/profile' });
+  },
+
+  /** 信息流头像 / 昵称 → 单条详情页 */
+  openDetail: function (e) {
+    const uid = e.currentTarget.dataset.uid;
+    if (!uid) return;
+    wx.navigateTo({ url: '/pages/detail/detail?uid=' + uid });
+  },
+
+  /** 右上角「…」→ 转发给微信好友：基础能力，无需申请任何权限 */
+  onShareAppMessage: function () {
+    return {
+      title: CONFIG.SITE_TITLE,
+      path: '/pages/index/index',
+    };
   },
 });

@@ -35,3 +35,7 @@
 - 发布前必做：公众平台 request 白名单 `pyq.ahxin.cn`、downloadFile 白名单 `memos.ahxin.cn`；appid 换真实值、urlCheck 改 true
 - 预览卡 appId：wbapp_qIhaUS8EW6TakWNQrLVtcp（未发布，面板右上角「分享」继续）
 - 踩坑：mini-program scaffold 模板被写成 CRLF 导致哈希校验失败，需把模板基础文件规范化为 LF
+- v2（2026-11-08 中午）：封面换用户竖图；新增资料页（两个可复制链接）与详情页（可复制 `?memo=` 链接 + 转发给好友）；封面头像→资料页、信息流头像/昵称→详情页
+- **权限结论**：转发 `onShareAppMessage` / 复制 `wx.setClipboardData` 零申请；`web-view` 外链与 `onShareTimeline` 需资质，已避开；不能由代码指定好友，只能用户点转发按钮自己选
+- 详情页用 `/api/memo?uid=` 冷启动可打开；分享 path=`/pages/detail/detail?uid=xxx`；`detail.wxss` 用 `@import` 复用首页样式
+- 静态校验 + 真实接口链路全过；预览卡沿用 wbapp_qIhaUS8EW6TakWNQrLVtcp

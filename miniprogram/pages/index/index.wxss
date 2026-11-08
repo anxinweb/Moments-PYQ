@@ -410,3 +410,10 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.55; }
 }
+
+/* 可点入口的轻反馈 */
+.cover-user:active,
+.avatar-wrap:active,
+.moment-name:active {
+    opacity: 0.6;
+}

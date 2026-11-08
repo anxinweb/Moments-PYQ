@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="sub-nav" style="padding-top:{{statusBarHeight}}px">
+    <view class="sub-nav-inner">
+      <view class="sub-nav-back" bindtap="goBack"><text class="sub-nav-back-icon">‹</text></view>
+      <text class="sub-nav-title">资料</text>
+    </view>
+  </view>
+
+  <view class="content" style="padding-top:{{contentTop}}px">
+    <view class="profile-card">
+      <image wx:if="{{profile.avatar}}" class="profile-avatar" src="{{profile.avatar}}" mode="aspectFill" binderror="onAvatarError"></image>
+      <view wx:else class="profile-avatar profile-avatar-fallback"></view>
+      <text class="profile-name">{{profile.name}}</text>
+      <text wx:if="{{profile.bio}}" class="profile-bio">{{profile.bio}}</text>
+    </view>
+
+    <view class="link-section">
+      <text class="section-label">链接（点击复制）</text>
+      <view class="link-card" wx:for="{{links}}" wx:key="key" data-url="{{item.url}}" bindtap="onCopy">
+        <view class="link-main">
+          <text class="link-label">{{item.label}}</text>
+          <text class="link-url">{{item.url}}</text>
+        </view>
+        <text class="link-copy">复制</text>
+      </view>
+    </view>
+
+    <text class="hint">小程序内不打开外部网页，复制后到浏览器粘贴访问即可。</text>
+  </view>
+</view>

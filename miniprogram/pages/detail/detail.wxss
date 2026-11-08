@@ -1,0 +1,85 @@
+@import "../index/index.wxss";
+
+/* 复用首页的动态展示样式（@import 指向已存在的本地文件） */
+
+.page {
+    min-height: 100vh;
+    background: #ffffff;
+}
+
+.content {
+    padding-bottom: 40px;
+}
+
+.moment {
+    padding-top: 18px;
+}
+
+.share-section {
+    margin-top: 16px;
+    padding: 16px;
+    border-top: 0.5px solid #e6e6e6;
+}
+
+.section-label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: #7f7f7f;
+}
+
+.share-card {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-radius: 6px;
+    background: #f7f7f7;
+}
+
+.share-card:active {
+    background: #f0f0f0;
+}
+
+.share-url {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: #576b95;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.share-copy {
+    flex: 0 0 auto;
+    margin-left: 12px;
+    font-size: 13px;
+    color: #576b95;
+}
+
+.share-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 44px;
+    margin-top: 12px;
+    padding: 0;
+    border-radius: 6px;
+    background: #07c160;
+    color: #ffffff;
+    font-size: 16px;
+    line-height: 44px;
+}
+
+.share-btn::after {
+    border: none;
+}
+
+.hint {
+    display: block;
+    margin-top: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #b2b2b2;
+}

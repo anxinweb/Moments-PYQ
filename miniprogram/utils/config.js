@@ -28,6 +28,15 @@ const CONFIG = {
 
   // 封面随包内置，不依赖额外域名；替换此图即可换封面
   COVER_URL: '/images/cover.jpg',
+  // 封面是竖图：aspectFill=铺满居中裁切（微信同款）；aspectFit=完整显示（两侧留深色底）
+  COVER_MODE: 'aspectFill',
+
+  // 资料页可复制的两个链接（只复制、不打开外链，避开 web-view 业务域名资质）
+  MEMOS_HOME: 'https://memos.ahxin.cn/u/ahxin',
+  SITE_HOME: 'https://pyq.ahxin.cn/',
+
+  // 详情页分享链接前缀，与网页版 ?memo=<uid> 一致
+  SHARE_BASE: 'https://pyq.ahxin.cn/?memo=',
 
   REQUEST_TIMEOUT: 12000,
 };

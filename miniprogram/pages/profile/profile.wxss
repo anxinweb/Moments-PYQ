@@ -1,0 +1,101 @@
+.page {
+    min-height: 100vh;
+    background: #ededed;
+}
+
+.content {
+    padding-bottom: 40px;
+}
+
+.profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 36px 20px 28px;
+    background: #ffffff;
+}
+
+.profile-avatar {
+    display: block;
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    background: #e2e2e2;
+}
+
+.profile-name {
+    margin-top: 12px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #191919;
+}
+
+.profile-bio {
+    margin-top: 6px;
+    font-size: 14px;
+    color: #7f7f7f;
+    text-align: center;
+}
+
+.link-section {
+    margin-top: 12px;
+    padding: 16px 16px 8px;
+    background: #ffffff;
+}
+
+.section-label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: #7f7f7f;
+}
+
+.link-card {
+    display: flex;
+    align-items: center;
+    padding: 14px 0;
+    border-top: 0.5px solid #e6e6e6;
+}
+
+.link-card:active {
+    background: #f7f7f7;
+}
+
+.link-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.link-label {
+    font-size: 16px;
+    color: #191919;
+}
+
+.link-url {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #576b95;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.link-copy {
+    flex: 0 0 auto;
+    margin-left: 12px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    background: #f2f2f2;
+    font-size: 13px;
+    color: #576b95;
+}
+
+.hint {
+    display: block;
+    padding: 16px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #b2b2b2;
+}
