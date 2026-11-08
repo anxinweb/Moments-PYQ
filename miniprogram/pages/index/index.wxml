@@ -112,9 +112,6 @@
 
   <!-- 回到顶部：长列表向下滚动后淡入，点击平滑回顶 -->
   <view class="top-btn {{showTop ? 'is-visible' : ''}}" bindtap="onBackTop">
-    <view class="top-ico">
-      <view class="top-ico-bar"></view>
-      <view class="top-ico-chevron"></view>
-    </view>
+    <image class="top-ico" src="/images/backtop.png"></image>
   </view>
 </view>

@@ -48,3 +48,5 @@
 - 同一次首次加载还可能连带报渲染层 `__g is not defined`，重启后自愈；`project.private.config.json` 的 `libVersion` 已锁定非灰度稳定版 3.17.5（改完需完全重启工具；或在「详情→本地设置→调试基础库」界面切换）
 - 日志里 `工具未校验合法域名…` 后的一长串 `api.js:9/getProfile/loadFirst` 堆栈是 warn 调用栈，不是异常
 - 1.0.2：首页右下角回顶按钮（滚动 >600px 淡入，`wx.pageScrollTo` 平滑回顶）；README 有版本记录与两段发布简介文案
+- 回顶图标重做为本地 PNG（顶部横线+带竖杆向上箭头，#7f7f7f，38px 半透明白圆+极淡阴影），不再用 CSS chevron；预览图 `.preview/backtop-preview.png`
+- 搜索需求待定：建议先不加；若做优先前端本地过滤（A 轻量版），后端方案需新增 `api/search.js` + redeploy Vercel

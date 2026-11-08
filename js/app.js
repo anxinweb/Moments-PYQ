@@ -411,12 +411,28 @@ async function loadEngagement(nodes) {
   }
 }
 
+/** 已展开评论区的动态（本会话内记忆，刷新恢复折叠，与微信一致） */
+const expandedDrawers = new Set();
+
 function paintDrawer(node) {
   const uid = (node.dataset.name || '').split('/')[1];
   const data = engaged.get(uid);
   const drawer = node.querySelector('.drawer');
   if (!drawer || !data) return;
-  drawer.innerHTML = drawerHtml(data.likes, withPending(uid, data.comments));
+  const inDetail = document.body.classList.contains('is-sub');
+  drawer.innerHTML = drawerHtml(data.likes, withPending(uid, data.comments), {
+    expanded: inDetail || expandedDrawers.has(uid),
+    noFold: inDetail, // 详情页就是看全部评论的，不出现折叠/收起按钮
+  });
+  const fold = drawer.querySelector('.drawer-fold');
+  if (fold) {
+    fold.addEventListener('click', (e) => {
+      e.stopPropagation(); // 不能触发 drawer 的「点空白=评论」
+      if (expandedDrawers.has(uid)) expandedDrawers.delete(uid);
+      else expandedDrawers.add(uid);
+      paintDrawer(node);
+    });
+  }
 }
 
 /**
@@ -1473,6 +1489,7 @@ async function loadDetailView(uid) {
     el.feed.appendChild(node);
     hydrateImages(node);
     bindMoment(node, { linkDetail: false });
+    expandedDrawers.add(uid); // 详情页就是来看评论的，直接全量展开
     loadEngagement([node]);
     bindShare(memo);
     onScroll();

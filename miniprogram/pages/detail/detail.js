@@ -2,7 +2,7 @@
  * 单条动态详情页
  * 进入方式：信息流点头像/昵称，或好友点开分享卡片（path 带 uid 冷启动）。
  * 数据与网页版 ?memo=<uid> 同源：GET /api/memo?uid=<uid>。
- * 分享两种：① 复制网页版链接（setClipboardData）② 转发给好友（onShareAppMessage）。
+ * 分享入口收在时间行的「两点」菜单里：① 复制网页版链接 ② 转发给好友。
  * 两者都是小程序基础能力，无需申请权限、无需用户授权。
  */
 const { CONFIG } = require('../../utils/config.js');
@@ -22,6 +22,7 @@ Page({
     viewState: 'loading',
     moment: null,
     playingKey: '',
+    shareMenuOpen: false,
 
     cell3Px: '90px',
     cell2Px: '140px',
@@ -56,7 +57,7 @@ Page({
 
   onHide: function () {
     this.destroyAudio();
-    this.setData({ playingKey: '' });
+    this.setData({ playingKey: '', shareMenuOpen: false });
   },
 
   onUnload: function () {
@@ -69,7 +70,7 @@ Page({
       this.setData({ viewState: 'error' });
       return;
     }
-    this.setData({ viewState: 'loading' });
+    this.setData({ viewState: 'loading', shareMenuOpen: false });
     Promise.all([
       getProfile().catch(function () { return null; }),
       getMemo(uid),
@@ -182,8 +183,19 @@ Page({
     }
   },
 
+  /* ------------------------------------------------------------ 两点菜单 */
+
+  toggleShareMenu: function () {
+    this.setData({ shareMenuOpen: !this.data.shareMenuOpen });
+  },
+
+  closeShareMenu: function () {
+    this.setData({ shareMenuOpen: false });
+  },
+
   /** 只复制网页版链接，不跳转、不内嵌网页 */
   onCopyShare: function () {
+    this.setData({ shareMenuOpen: false });
     wx.setClipboardData({ data: this.data.shareUrl });
   },
 

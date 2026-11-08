@@ -827,6 +827,27 @@ a {
   background: var(--line);
 }
 
+/* 「查看全部 N 条评论 / 收起」 */
+.drawer-fold-wrap {
+  padding: 4px 10px 7px;
+}
+
+.drawer-fold {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--link);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.drawer-fold:active {
+  opacity: 0.55;
+}
+
 .drawer-comments {
   padding: 2px 0;
 }

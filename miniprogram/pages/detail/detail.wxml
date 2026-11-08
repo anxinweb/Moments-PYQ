@@ -70,18 +70,20 @@
             </view>
           </view>
 
-          <view class="meta"><text class="moment-time">{{moment.timeText}}</text></view>
+          <view class="meta">
+            <text class="moment-time">{{moment.timeText}}</text>
+            <view class="more-btn" bindtap="toggleShareMenu">
+              <view class="more-dot"></view>
+              <view class="more-dot"></view>
+            </view>
+            <view wx:if="{{shareMenuOpen}}" class="popover">
+              <view class="pop-arrow"></view>
+              <view class="pop-btn" bindtap="onCopyShare">复制链接</view>
+              <view class="pop-sep"></view>
+              <button class="pop-btn" open-type="share" bindtap="closeShareMenu">分享给好友</button>
+            </view>
+          </view>
         </view>
-      </view>
-
-      <view class="share-section">
-        <text class="section-label">分享</text>
-        <view class="share-card" bindtap="onCopyShare">
-          <text class="share-url">{{shareUrl}}</text>
-          <text class="share-copy">复制链接</text>
-        </view>
-        <button class="share-btn" open-type="share">分享给微信好友</button>
-        <text class="hint">复制的链接在浏览器打开是网页版详情页；转发给好友会直接打开小程序内的这条动态。</text>
       </view>
     </block>
 
