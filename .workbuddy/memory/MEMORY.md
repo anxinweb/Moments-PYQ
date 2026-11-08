@@ -43,3 +43,8 @@
 - **导入目录必须是 `miniprogram/` 子目录**（不是项目根）；`urlCheck:false` 便于调试，上传前需配白名单并改回 true
 - 发布前总检全 PASS（静态 + mock 三页面全链路 + 远程资源 206）；`getSystemInfoSync` 已改为优先 `getWindowInfo` 兼容
 - 上传前平台侧必做：request 白名单 pyq.ahxin.cn、downloadFile 白名单 memos.ahxin.cn（真机只认白名单）
+- 开发者工具实际装在 `D:\Application\微信web开发者工具`；日志在 `%LOCALAPPDATA%\微信开发者工具\User Data\<hash>\WeappLog\logs`
+- 踩坑：`simulator launch failed` 多为**基础库首次下载 41MB 超时**（日志 `routeTo appLaunch timeout`），非代码问题；点「编译」/ 重启工具 / 切到已缓存的 3.17.5 即可
+- 同一次首次加载还可能连带报渲染层 `__g is not defined`，重启后自愈；`project.private.config.json` 的 `libVersion` 已锁定非灰度稳定版 3.17.5（改完需完全重启工具；或在「详情→本地设置→调试基础库」界面切换）
+- 日志里 `工具未校验合法域名…` 后的一长串 `api.js:9/getProfile/loadFirst` 堆栈是 warn 调用栈，不是异常
+- 1.0.2：首页右下角回顶按钮（滚动 >600px 淡入，`wx.pageScrollTo` 平滑回顶）；README 有版本记录与两段发布简介文案

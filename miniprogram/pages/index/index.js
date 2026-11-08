@@ -9,12 +9,14 @@ const { getProfile, getMemos } = require('../../utils/api.js');
 const fmt = require('../../utils/format.js');
 
 const GAP = 4;
+const TOP_THRESHOLD = 600;
 
 Page({
   data: {
     statusBarHeight: 20,
     coverHeight: 300,
     navSolid: false,
+    showTop: false,
 
     profile: { name: CONFIG.NICKNAME, avatar: '' },
     coverUrl: CONFIG.COVER_URL,
@@ -71,9 +73,14 @@ Page({
   },
 
   onPageScroll: function (e) {
+    // 只在状态真正改变时 setData，避免滚动过程频繁触发渲染
     const threshold = this.data.coverHeight - 44 - this.data.statusBarHeight;
+    const patch = {};
     const solid = e.scrollTop > threshold;
-    if (solid !== this.data.navSolid) this.setData({ navSolid: solid });
+    if (solid !== this.data.navSolid) patch.navSolid = solid;
+    const showTop = e.scrollTop > TOP_THRESHOLD;
+    if (showTop !== this.data.showTop) patch.showTop = showTop;
+    if (Object.keys(patch).length) this.setData(patch);
   },
 
   onPullDownRefresh: function () {
@@ -93,7 +100,7 @@ Page({
       if (callback) callback();
     };
     this.destroyAudio();
-    this.setData({ viewState: 'loading', loadError: false, playingKey: '' });
+    this.setData({ viewState: 'loading', loadError: false, playingKey: '', showTop: false });
 
     Promise.all([
       getProfile().catch(function () { return null; }),
@@ -261,6 +268,11 @@ Page({
 
   onRetryMore: function () {
     this.loadMore();
+  },
+
+  /** 回到顶部：wx.pageScrollTo 是基础能力，零权限 */
+  onBackTop: function () {
+    wx.pageScrollTo({ scrollTop: 0, duration: 300 });
   },
 
   /* ------------------------------------------------------------ 页面入口与转发 */

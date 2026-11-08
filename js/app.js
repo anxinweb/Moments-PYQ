@@ -16,7 +16,7 @@ import {
   removePendingComments,
   PLACEHOLDER_AVATAR,
 } from './api.js';
-import { renderMoment, imagesOf, drawerHtml } from './render.js';
+import { renderMoment, imagesOf, drawerHtml, linkifyText } from './render.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -510,7 +510,14 @@ function openInlineComment(node, uid, reply) {
 function closeInlineComment() {
   if (!commentNode) return;
   const box = commentNode.querySelector('.comment-inline');
-  if (box) box.hidden = true;
+  if (box) {
+    box.hidden = true;
+    // 顺手收起表情面板（下次打开是干净状态）
+    const panel = box.querySelector('.emoji-panel');
+    const toggle = box.querySelector('.emoji-toggle');
+    if (panel) panel.hidden = true;
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  }
   commentNode = null;
   replyCtx = null;
 }
@@ -612,8 +619,7 @@ function bindCommentInline(node) {
       input.focus();
     }
   });
-  // 语音/表情/图片占位图标（微信同款外观，功能暂未开放）
-  // 表情：打开面板点选插入；语音/图片仍是占位
+  // 表情：打开面板可连续点选多个，面板只在点外部/再点图标/收起评论框时关闭
   const panel = box.querySelector('.emoji-panel');
   const toggle = box.querySelector('.emoji-toggle');
   const closePanel = () => {
@@ -636,6 +642,7 @@ function bindCommentInline(node) {
       if (!btn) return;
       e.stopPropagation();
       const emoji = btn.textContent || '';
+      // 每次插入前重新读光标位置（连续点选时上一次的选区已经更新）
       const start = input.selectionStart ?? input.value.length;
       const end = input.selectionEnd ?? start;
       input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
@@ -647,8 +654,7 @@ function bindCommentInline(node) {
         /* ignore */
       }
       send.disabled = input.value.trim().length === 0;
-      // 插入后淡出面板，避免挡住正文
-      closePanel();
+      // 不收起面板：方便连续插入多个表情
     });
     document.addEventListener('click', (e) => {
       if (panel.hidden) return;
@@ -656,15 +662,22 @@ function bindCommentInline(node) {
       closePanel();
     });
   }
-  // 语音 / 图片仍是占位
-  box.querySelectorAll('.comment-emos button:not(.emoji-toggle)').forEach((b) => {
-    b.addEventListener('click', () => toast('暂不支持语音 / 图片评论'));
-  });
 }
 
 function initCommentBar() {
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeInlineComment();
+    if (e.key !== 'Escape') return;
+    // 表情面板开着就先收面板，再按一次才收评论框
+    if (commentNode) {
+      const panel = commentNode.querySelector('.emoji-panel');
+      const toggle = commentNode.querySelector('.emoji-toggle');
+      if (panel && !panel.hidden) {
+        panel.hidden = true;
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        return;
+      }
+    }
+    closeInlineComment();
   });
   // 点输入框以外的空白处收起（点浮层/评论区/九宫格等正常交互不受影响）
   document.addEventListener('click', (e) => {
@@ -1517,13 +1530,23 @@ function fallbackCopy(text) {
 async function loadAboutView() {
   await ensureProfile();
   const p = state.profile;
+  const links = (CONFIG.PROFILE_LINKS || [])
+    .filter((l) => l && l.url && l.label)
+    .map(
+      (l) =>
+        `<a class="profile-btn" href="${escape(l.url)}" target="_blank" rel="noopener noreferrer">${escape(
+          l.label
+        )}</a>`
+    )
+    .join('');
   el.feed.innerHTML =
     `<section class="profile-page">` +
     `<img class="profile-avatar" src="${p.avatar || PLACEHOLDER_AVATAR}" alt="" decoding="async">` +
     `<h2 class="profile-name">${escape(p.name)}</h2>` +
-    (p.bio ? `<p class="profile-bio">${escape(p.bio)}</p>` : '') +
+    (p.bio ? `<p class="profile-bio">${linkifyText(p.bio)}</p>` : '') +
     `<div class="profile-actions">` +
-    `<a class="profile-btn" href="${CONFIG.MEMOS_URL}/u/${CONFIG.ADMIN_USER}" target="_blank" rel="noopener">Memos 主页</a>` +
+    links +
+    `<a class="profile-btn ghost" href="${CONFIG.MEMOS_URL}/u/${CONFIG.ADMIN_USER}" target="_blank" rel="noopener">Memos 主页</a>` +
     `<a class="profile-btn ghost" href="./">返回朋友圈</a>` +
     `</div>` +
     `</section>`;

@@ -90,6 +90,8 @@ fetch(U.replace(/\/$/,"")+"/pipeline",{method:"POST",headers:{authorization:"Bea
 | 封面改成自动取最新配图 | `COVER.MODE: 'memo'` |
 | 每页条数 | `PAGE_SIZE` |
 | 隐藏/显示 #标签 | `HIDE_TAGS` |
+| 自我介绍 | Memos → 设置 → 我的账号 → **描述**（支持换行，网址会自动变链接），本站自动同步 |
+| 资料页加跳转链接 | `js/config.js` 的 `PROFILE_LINKS` 数组里加 `{ label: '名称', url: '网址' }` |
 
 ## 路线图
 

@@ -47,6 +47,16 @@ export const CONFIG = {
   // 右上角相机按钮跳转地址
   POST_URL: 'https://memos.ahxin.cn',
 
+  /* ---------------- 个人资料页 ----------------
+   * 自我介绍：在 Memos 里改「设置 → 我的账号 → 描述」，本站自动同步（支持换行和网址）
+   * 额外链接：在下面数组里加一行即可，显示在资料页按钮区
+   *   { label: '按钮文字', url: 'https://...' }
+   */
+  PROFILE_LINKS: [
+    // { label: '我的博客', url: 'https://ahxin.cn' },
+    // { label: 'GitHub', url: 'https://github.com/anxinweb' },
+  ],
+
   /* ---------------- 评论（P2 生效） ----------------
    * 建一个专用账号来发评论，其 Access Token 只放 Vercel 环境变量
    * MEMOS_BOT_TOKEN，绝不进前端代码。评论先写成「私有」= 待审，

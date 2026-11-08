@@ -417,3 +417,61 @@
 .moment-name:active {
     opacity: 0.6;
 }
+
+/* ---------------------------------------------------------------- 回到顶部 */
+.top-btn {
+    position: fixed;
+    right: 16px;
+    bottom: 28px;
+    z-index: 25;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 0.5px solid #e6e6e6;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.16);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    pointer-events: none;
+}
+
+.top-btn.is-visible {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+
+.top-btn:active {
+    transform: scale(0.92);
+}
+
+.top-ico {
+    position: relative;
+    width: 18px;
+    height: 18px;
+}
+
+.top-ico-bar {
+    position: absolute;
+    left: 2px;
+    top: 1px;
+    width: 14px;
+    height: 2px;
+    border-radius: 1px;
+    background: #576b95;
+}
+
+.top-ico-chevron {
+    position: absolute;
+    left: 4px;
+    top: 8px;
+    width: 9px;
+    height: 9px;
+    border-left: 2px solid #576b95;
+    border-top: 2px solid #576b95;
+    transform: rotate(45deg);
+}
