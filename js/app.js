@@ -119,12 +119,12 @@ function applyProfile(profile) {
 function setCover(url) {
   if (state.coverSet || !url) return;
   state.coverSet = true;
-  el.coverImg.addEventListener(
-    'load',
-    () => el.coverImg.classList.add('is-ready'),
-    { once: true }
-  );
-  el.coverImg.src = url;
+  const img = el.coverImg;
+  const ready = () => img.classList.add('is-ready');
+  img.addEventListener('load', ready, { once: true });
+  img.src = url;
+  // 命中缓存时 load 可能不再触发（尤其 iOS），补一次同步判断，避免封面永远是底色
+  if (img.complete && img.naturalWidth > 0) ready();
 }
 
 function applyCoverPosition() {
@@ -832,6 +832,30 @@ function appendMoments(memos) {
   loadEngagement(nodes); // 点赞/评论异步补位，不阻塞正文
 }
 
+/* 弱网兜底：首屏迟迟没数据时给提示和重试出口，而不是一直挂灰骨架 */
+let slowTimer = 0;
+
+function clearSlowTimer() {
+  if (slowTimer) clearTimeout(slowTimer);
+  slowTimer = 0;
+}
+
+function feedNoteHtml(text) {
+  return (
+    `<div class="feed-note">` +
+    `<p>${text}</p>` +
+    `<button type="button" class="retry" id="feedNoteRetry">重新加载</button>` +
+    `</div>`
+  );
+}
+
+function showFeedNote(text) {
+  if (state.loadedPages > 0 || el.feed.querySelector('.feed-note')) return;
+  el.feed.insertAdjacentHTML('beforeend', feedNoteHtml(text));
+  const btn = el.feed.querySelector('.feed-note .retry');
+  if (btn) btn.addEventListener('click', () => location.reload());
+}
+
 async function loadOnePage() {
   if (state.loading || state.done) return;
   state.loading = true;
@@ -864,6 +888,7 @@ async function loadOnePage() {
 
     // 首页数据到达后移除骨架占位
     if (state.loadedPages === 0) el.feed.innerHTML = '';
+    clearSlowTimer();
     appendMoments(memos);
     state.loadedPages += 1;
     state.tokens[state.loadedPages] = nextPageToken;
@@ -890,7 +915,14 @@ async function loadOnePage() {
   } catch (err) {
     console.error('[feed]', err);
     state.failed = true;
-    if (!state.count) el.feed.innerHTML = '';
+    clearSlowTimer();
+    if (state.loadedPages === 0) {
+      el.feed.innerHTML = feedNoteHtml('内容加载失败，请检查网络');
+      const btn = el.feed.querySelector('.feed-note .retry');
+      if (btn) btn.addEventListener('click', () => location.reload());
+    } else if (!state.count) {
+      el.feed.innerHTML = '';
+    }
   } finally {
     state.loading = false;
     el.spinner.hidden = true;
@@ -1667,6 +1699,8 @@ async function boot() {
   const cachedProfile = readCachedProfile();
   if (cachedProfile) applyProfile(cachedProfile); // 昵称/头像先用缓存，不用等接口
   const hadSnapshot = paintSnapshot();
+  // 没有本地快照时，6 秒还没数据就提示 + 给重试出口（有快照页面已有内容，不需要）
+  if (!hadSnapshot) slowTimer = setTimeout(() => showFeedNote('网络有点慢，还在加载…'), 6000);
   const freshFirstPage = hadSnapshot ? getMemos({ pageToken: '' }) : null;
   if (!hadSnapshot) firstPageTask = getMemos({ pageToken: '' });
   await Promise.all([profileTask, gotoPage(pageFromUrl())]);

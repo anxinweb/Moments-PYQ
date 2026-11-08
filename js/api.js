@@ -2,13 +2,36 @@ import { CONFIG } from './config.js';
 
 const BASE = CONFIG.API_BASE;
 
-async function getJSON(path) {
-  const res = await fetch(BASE + path, {
-    headers: { accept: 'application/json' },
-    credentials: 'omit',
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+/* 弱网保命：请求不能无限挂着（手机 4G 冷启动常见 TCP 长时间无响应），
+   超时就 abort，并自动重试一次；仍失败才抛错，由页面显示重试入口 */
+const GET_TIMEOUT = 10000;
+const RETRY_DELAY = 400;
+
+function fetchTimeout(url, init, ms) {
+  const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), ms) : 0;
+  return fetch(url, { ...init, signal: ctl ? ctl.signal : undefined }).finally(() => clearTimeout(timer));
+}
+
+async function getJSON(path, opts = {}) {
+  const timeout = opts.timeout || GET_TIMEOUT;
+  const retries = opts.retry === undefined ? 1 : opts.retry;
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetchTimeout(
+        BASE + path,
+        { headers: { accept: 'application/json' }, credentials: 'omit' },
+        timeout
+      );
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    } catch (err) {
+      lastErr = err;
+      if (i < retries) await new Promise((r) => setTimeout(r, RETRY_DELAY * (i + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 function absolute(url) {
