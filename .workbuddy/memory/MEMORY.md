@@ -14,6 +14,9 @@
 - 仓库 anxinweb/Moments-PYQ：GitHub MCP unauthorized，用本地 git push；远端 main 分支 2026-11-08 重建过
 - **弱网兜底**（v20261109f）：所有 GET 走 api.js `getJSON`（统一 10s 超时 + 自动重试 1 次），新增请求别绕过它；首屏 6s 无数据弹 .feed-note「网络有点慢」+ 重载，失败显示失败态而非空白；封面 setCover 需 complete 兜底（iOS 缓存命中可能不触发 load）
 - **视频动态**（v20261109h，用户拍板）：**不做封面**，直接嵌 `<video controls preload="metadata">`（黑块可接受）；20261109g 的静态封面帧方案已整套撤掉（config VIDEO_POSTERS / assets/video-poster-* / .video-* 样式 / 播放委托），别再自作主张加回来。若将来要自动封面：memos 文件服务有 CORS 且支持 Range，跨域 canvas 抽帧可行，首帧约 1MB/视频
+- **分页**（v20261109n）：滚到距底 600px 自动加载下一页（`maybeAutoLoad`），底部按钮只作兜底；别改回「只有按钮」——懒加载图片会把页面撑高，按钮被顶出视口，用户会以为「加载更多不见了」
+- **详情页秒开**（v20261109n）：`loadDetailView` 先用 `readSnapshot()` 里的首页数据渲染，profile 不阻塞，`getMemo` 只做后台校验（内容不一致才重绘）
+- **测试基线**（交付标准）：`.preview/e2e-ui.mjs`(32) + `e2e-extra.mjs`(17) + `e2e-interact.mjs`(10) + `test-sweep.mjs`(24) + `test-pager` / `test-weaknet` / `test-video-nodl` / `test-fold-*` / `test-detail-speed`；BASE 环境变量切线上/本地
 - **视频防下载**（v20261109i）：视频一律无文件名链接（videoHtml 里不放 <a>），controlslist=nodownload、禁画中画/投屏、CSS 禁长按菜单、全局 contextmenu 拦 video 右键；fileHtml 普通附件的下载链接保留；更强防护（Referer 防盗链）需改 Memos 端 openresty，会连累小程序，未做
 
 ## 当前方案（用户拍板）
