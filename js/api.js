@@ -154,11 +154,16 @@ export async function getLikes(uids) {
 
 /** 点赞 / 取消点赞，返回最新状态；url 为访客主页链接（选填，点昵称跳转） */
 export async function toggleLike(uid, on, name, url) {
-  const res = await fetch(BASE + '/likes', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ uid, visitor: visitorId(), name: name || '访客', url: url || '', on: !!on }),
-  });
+  // 写请求也带超时：网络卡住时不能让按钮一直转圈
+  const res = await fetchTimeout(
+    BASE + '/likes',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ uid, visitor: visitorId(), name: name || '访客', url: url || '', on: !!on }),
+    },
+    15000
+  );
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
 }
@@ -177,18 +182,22 @@ export async function getComments(uids) {
  * 返回 { uid } 供本地「审核中」显示与过审匹配
  */
 export async function postComment(uid, name, url, text, reply) {
-  const res = await fetch(BASE + '/comments', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      uid,
-      name,
-      url: url || '',
-      text,
-      replyTo: reply?.attachUid || '',
-      replyName: reply?.replyName || '',
-    }),
-  });
+  const res = await fetchTimeout(
+    BASE + '/comments',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        uid,
+        name,
+        url: url || '',
+        text,
+        replyTo: reply?.attachUid || '',
+        replyName: reply?.replyName || '',
+      }),
+    },
+    15000
+  );
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return res.json();
 }
