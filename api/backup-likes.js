@@ -47,10 +47,15 @@ export default async function handler(request) {
 
   try {
     // 1. SCAN 出所有 like:* 键
+    //    注意 redis() 返回的是每条命令结果的数组：SCAN 的结果本身是 ["cursor", ["k1","k2"]]，
+    //    所以这里要再取一层 res[0] 才能拿到 [cursor, keys]。
     const keys = [];
     let cursor = '0';
     for (let i = 0; i < 200; i++) {
-      const [next, batch] = await redis([['SCAN', cursor, 'MATCH', 'like:*', 'COUNT', 200]]);
+      const res = await redis([['SCAN', cursor, 'MATCH', 'like:*', 'COUNT', 200]]);
+      const tuple = (res && res[0]) || [];
+      const next = tuple[0];
+      const batch = tuple[1];
       cursor = String(next || '0');
       (batch || []).forEach((k) => keys.push(k));
       if (cursor === '0') break;
