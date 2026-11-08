@@ -16,7 +16,7 @@ import {
   removePendingComments,
   PLACEHOLDER_AVATAR,
 } from './api.js';
-import { renderMoment, imagesOf, drawerHtml, linkifyText } from './render.js';
+import { renderMoment, imagesOf, drawerHtml, linkifyText, skeletonHtml } from './render.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -929,6 +929,7 @@ async function loadOnePage() {
     el.spinner.hidden = true;
     el.moreBtn.disabled = false;
     updatePager();
+    onScroll(); // 加载完再检查一次：内容仍不够一屏时继续自动翻页
   }
 }
 
@@ -1513,8 +1514,13 @@ function setupChrome(route) {
 }
 
 async function loadDetailView(uid) {
+  // 资料（昵称/头像）不阻塞详情渲染：本地有缓存先用，没有就先用默认值，
+  // 否则弱网下要等资料接口，页面会空好几秒
+  const cachedProfile = readCachedProfile();
+  if (cachedProfile) applyProfile(cachedProfile);
+  el.feed.innerHTML = skeletonHtml(1);
   try {
-    const [memo] = await Promise.all([getMemo(uid), ensureProfile()]);
+    const memo = await getMemo(uid);
     el.feed.innerHTML = '';
     const frag = document.createElement('div');
     frag.innerHTML = renderMoment(memo, state.profile, { folded: false });
@@ -1525,6 +1531,11 @@ async function loadDetailView(uid) {
     expandedDrawers.add(uid); // 详情页就是来看评论的，直接全量展开
     loadEngagement([node]);
     bindShare(memo);
+    // 资料后到就补上昵称（头像由 applyProfile 统一回填）
+    ensureProfile().then((p) => {
+      const nameEl = node.querySelector('.moment-name');
+      if (nameEl && p && p.name) nameEl.textContent = p.name;
+    });
     onScroll();
   } catch (err) {
     console.error('[memo]', err);
@@ -1578,6 +1589,8 @@ function fallbackCopy(text) {
 }
 
 async function loadAboutView() {
+  // 先放骨架，避免资料接口慢时白屏
+  el.feed.innerHTML = skeletonHtml(1);
   await ensureProfile();
   const p = state.profile;
   const links = (CONFIG.PROFILE_LINKS || [])
@@ -1637,6 +1650,17 @@ function ensureProfile() {
 
 let ticking = false;
 
+/* 滚到底部自动加载下一页（微信同款）：
+   以前只有底部按钮，但懒加载图片会把页面撑高，按钮被顶到屏幕外，看起来像「加载更多不见了」。
+   现在距底 600px 就自动取下一页，按钮仍保留给想手动点的人 */
+const AUTO_LOAD_GAP = 600;
+
+function maybeAutoLoad() {
+  if (state.loadedPages === 0 || state.done || state.loading || state.failed) return;
+  const rest = document.documentElement.scrollHeight - (window.scrollY || 0) - window.innerHeight;
+  if (rest < AUTO_LOAD_GAP) loadOnePage();
+}
+
 function onScroll() {
   if (ticking) return;
   ticking = true;
@@ -1646,11 +1670,14 @@ function onScroll() {
     const coverH = el.coverImg ? el.cover.offsetHeight : 0;
     el.nav.classList.toggle('is-solid', y > coverH - 44);
     el.topBtn.classList.toggle('is-show', y > 1200);
+    maybeAutoLoad();
   });
 }
 
 function initScroll() {
   window.addEventListener('scroll', onScroll, { passive: true });
+  // 内容不足一屏或图片加载后没触发滚动时，也检查一次
+  window.addEventListener('resize', onScroll, { passive: true });
   el.topBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
   // 顶部「朋友圈」是普通链接：点击整页跳回首页刷新（导航逻辑交给浏览器）
   onScroll();

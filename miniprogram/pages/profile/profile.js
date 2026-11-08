@@ -28,8 +28,14 @@ Page({
       fontPx: (16 * fmt.fontScale()).toFixed(1) + 'px',
     });
     getProfile()
-      .then(function (p) { this.setData({ profile: p }); }.bind(this))
+      .then(function (p) {
+        if (!this._unloaded) this.setData({ profile: p });
+      }.bind(this))
       .catch(function () { /* 保留兜底资料 */ });
+  },
+
+  onUnload: function () {
+    this._unloaded = true;
   },
 
   goBack: function () {
@@ -52,6 +58,10 @@ Page({
   },
 
   onShareAppMessage: function () {
-    return { title: CONFIG.SITE_TITLE, path: '/pages/index/index' };
+    return {
+      title: CONFIG.SITE_TITLE,
+      path: '/pages/index/index',
+      imageUrl: CONFIG.FALLBACK_SHARE_IMAGE,
+    };
   },
 });

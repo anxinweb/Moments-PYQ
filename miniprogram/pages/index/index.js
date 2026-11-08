@@ -18,6 +18,8 @@ Page({
     navSolid: false,
     showTop: false,
     fontPx: '16px',
+    foldLines: CONFIG.FOLD_LINES,
+    charsPerLine: 18,
 
     profile: { name: CONFIG.NICKNAME, avatar: '' },
     coverUrl: CONFIG.COVER_URL,
@@ -46,8 +48,11 @@ Page({
     const sys = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
     const width = sys.windowWidth || 375;
     const height = sys.windowHeight || 700;
+    const scale = fmt.fontScale();
     // 与 WXSS 的固定 px 布局对应：左右 16 + 头像 40 + 间距 12
     const contentW = width - 84;
+    // 正文每行约可容纳的中文字数，供「是否折叠」的估算使用
+    const charsPerLine = Math.max(8, Math.floor(contentW / (16 * scale)));
     const cell3 = Math.max(60, Math.floor((contentW - GAP * 2) / 3));
     const grid2W = Math.max(140, Math.floor(contentW * 0.666));
     const cell2 = Math.max(60, Math.floor((grid2W - GAP) / 2));
@@ -57,10 +62,13 @@ Page({
     this.audioCtx = null;
     this.lastAudioSec = -1;
     this.audioDurationSec = 0;
+    // 首屏/每次刷新递增，作废旧分页请求的回调
+    this.pageGeneration = 0;
     this.setData({
       statusBarHeight: sys.statusBarHeight || 20,
       coverHeight: coverHeight,
-      fontPx: (16 * fmt.fontScale()).toFixed(1) + 'px',
+      fontPx: (16 * scale).toFixed(1) + 'px',
+      charsPerLine: charsPerLine,
       cell3Px: cell3 + 'px',
       cell2Px: cell2 + 'px',
       grid2WidthPx: grid2W + 'px',
@@ -75,6 +83,7 @@ Page({
   },
 
   onUnload: function () {
+    this._unloaded = true;
     this.destroyAudio();
   },
 
@@ -105,9 +114,14 @@ Page({
     const finish = function () {
       if (callback) callback();
     };
+    // 作废所有进行中的分页请求，避免旧第二页回来覆盖刷新后的列表
+    this.pageGeneration = (this.pageGeneration || 0) + 1;
+    const hasContent = this.data.moments.length > 0;
     this.destroyAudio();
     this.setData({
-      viewState: 'loading',
+      // 已有内容时保持原视图（下拉刷新自带原生指示器），弱网失败也不会卡在骨架屏
+      viewState: hasContent ? this.data.viewState : 'loading',
+      loadingMore: false,
       loadError: false,
       showTop: false,
       playingKey: '',
@@ -120,6 +134,7 @@ Page({
       getMemos('').catch(function () { return null; }),
     ])
       .then(function (results) {
+        if (this._unloaded) return; // 页面已销毁，不再 setData
         const profile = results[0];
         const page = results[1];
         const patch = {};
@@ -129,13 +144,15 @@ Page({
           if (!this.data.moments.length) {
             patch.viewState = 'error';
           } else {
+            patch.viewState = 'ready';
             wx.showToast({ title: '刷新失败，已保留现有内容', icon: 'none' });
           }
           this.setData(patch);
           return;
         }
 
-        const list = page.memos.map(this.buildMoment, this);
+        const opts = this.momentOptions();
+        const list = page.memos.map(function (m) { return fmt.buildMoment(m, opts); });
         patch.moments = list;
         patch.nextPageToken = page.nextPageToken;
         patch.done = !page.nextPageToken;
@@ -143,7 +160,8 @@ Page({
         this.setData(patch);
       }.bind(this))
       .catch(function () {
-        this.setData({ viewState: 'error' });
+        if (this._unloaded) return;
+        this.setData({ viewState: this.data.moments.length ? 'ready' : 'error' });
       }.bind(this))
       .then(finish);
   },
@@ -151,60 +169,44 @@ Page({
   loadMore: function () {
     const d = this.data;
     if (d.loadingMore || d.done || d.viewState !== 'ready' || !d.nextPageToken) return;
+    const gen = this.pageGeneration || 0;
     this.setData({ loadingMore: true, loadError: false });
 
     getMemos(d.nextPageToken)
       .then(function (page) {
-        const list = page.memos.map(this.buildMoment, this);
-        this.setData({
-          moments: d.moments.concat(list),
-          nextPageToken: page.nextPageToken,
-          done: !page.nextPageToken,
-          loadingMore: false,
+        if (gen !== this.pageGeneration || this._unloaded) return; // 期间刷新过或已销毁，丢弃旧结果
+        const opts = this.momentOptions();
+        const list = page.memos.map(function (m) { return fmt.buildMoment(m, opts); });
+        // 只下发新增项：翻得越深，整份列表（含全部图片地址）重复传输的开销越大
+        const patch = {};
+        const start = this.data.moments.length;
+        list.forEach(function (m, i) {
+          patch['moments[' + (start + i) + ']'] = m;
         });
+        patch.nextPageToken = page.nextPageToken;
+        patch.done = !page.nextPageToken;
+        patch.loadingMore = false;
+        this.setData(patch);
       }.bind(this))
       .catch(function () {
+        if (gen !== this.pageGeneration || this._unloaded) return;
         this.setData({ loadingMore: false, loadError: true });
       }.bind(this));
   },
 
-  /** Memos 原始 memo → WXML 可直接绑定的展示对象（复杂计算全部在此完成） */
-  buildMoment: function (memo) {
-    const content = fmt.renderContent(memo.content, { hideTags: CONFIG.HIDE_TAGS });
-    const media = fmt.mediaOf(memo);
-    const total = media.images.length;
-    const shown = media.images.slice(0, 9);
-    const images = shown.map(function (img, i) {
-      return {
-        thumb: img.thumb,
-        origin: img.url,
-        more: i === 8 && total > 9,
-        moreCount: total - 9,
-      };
-    });
-    const gridType = total === 1 ? 1 : (total === 2 || total === 4) ? 2 : 3;
-    const lineCount = (content.match(/\n/g) || []).length + 1;
-    const needFold = content.length > 150 || lineCount > CONFIG.FOLD_LINES;
-
+  /** 展示对象统一由 utils/format.js#buildMoment 生成，这里只提供页面差异参数 */
+  momentOptions: function () {
     return {
-      uid: String(memo.name || '').split('/')[1] || String(memo.name || ''),
-      content: content,
-      needFold: needFold,
-      // 只有真正会被截断的长文本才默认折叠；短文本直接展开并可长按复制，
-      // 否则短文本既没有「全文」按钮又拿不到 user-select，会永远无法复制
-      folded: needFold,
-      timeText: fmt.timeText(memo.createTime),
-      images: images,
-      // +N 折叠的图片也能在预览里左右滑到，与微信一致
-      allOrigins: media.images.map(function (img) { return img.url; }),
-      gridType: gridType,
-      gridStyle: gridType === 2 ? 'width:' + this.data.grid2WidthPx : '',
-      cellStyle:
-        gridType === 2
-          ? 'width:' + this.data.cell2Px + ';height:' + this.data.cell2Px
-          : 'width:' + this.data.cell3Px + ';height:' + this.data.cell3Px,
-      singleStyle: 'width:' + this.data.singleWidthPx,
-      extras: media.extras,
+      hideTags: CONFIG.HIDE_TAGS,
+      foldable: true,
+      foldLines: CONFIG.FOLD_LINES,
+      charsPerLine: this.data.charsPerLine,
+      layout: {
+        cell3Px: this.data.cell3Px,
+        cell2Px: this.data.cell2Px,
+        grid2WidthPx: this.data.grid2WidthPx,
+        singleWidthPx: this.data.singleWidthPx,
+      },
     };
   },
 
@@ -262,11 +264,16 @@ Page({
     ctx.src = url;
     this.lastAudioSec = -1;
     this.audioDurationSec = 0;
+    // 旧实例 destroy 后回调仍可能到达（onError → destroy → stop 尤其容易），
+    // 统一校验当前实例，避免旧回调覆盖新播放状态
+    const alive = function () { return this.audioCtx === ctx; }.bind(this);
     ctx.onCanplay(function () {
+      if (!alive()) return;
       this.audioDurationSec = Number(ctx.duration) || 0;
       this.setData({ audioTimeText: '0:00 / ' + fmt.clockText(this.audioDurationSec) });
     }.bind(this));
     ctx.onTimeUpdate(function () {
+      if (!alive()) return;
       const cur = Number(ctx.currentTime) || 0;
       const sec = Math.floor(cur);
       if (sec === this.lastAudioSec) return; // 每秒最多刷新一次
@@ -277,11 +284,12 @@ Page({
         audioProgress: dur ? Math.min(100, Math.round((cur / dur) * 100)) : 0,
       });
     }.bind(this));
-    ctx.onEnded(function () { this.resetAudioState(); }.bind(this));
-    ctx.onError(function () { this.resetAudioState(); }.bind(this));
-    ctx.play();
+    ctx.onEnded(function () { if (alive()) this.resetAudioState(); }.bind(this));
+    ctx.onError(function () { if (alive()) this.resetAudioState(); }.bind(this));
+    // 先挂实例再 play，避免基础库同步触发 onCanplay 时被校验误挡
     this.audioCtx = ctx;
     this.setData({ playingKey: url, audioProgress: 0, audioTimeText: '0:00 / --:--' });
+    ctx.play();
   },
 
   resetAudioState: function () {
@@ -290,14 +298,15 @@ Page({
   },
 
   destroyAudio: function () {
-    if (!this.audioCtx) return;
+    const ctx = this.audioCtx;
+    if (!ctx) return;
+    this.audioCtx = null; // 先置空：stop/destroy 期间触发的回调会被 alive() 挡掉
     try {
-      this.audioCtx.stop();
-      this.audioCtx.destroy();
+      ctx.stop();
+      ctx.destroy();
     } catch (err) {
       /* ignore */
     }
-    this.audioCtx = null;
   },
 
   onRetry: function () {
@@ -332,6 +341,8 @@ Page({
     return {
       title: CONFIG.SITE_TITLE,
       path: '/pages/index/index',
+      // 不指定时微信会自动截屏，弱网或首屏未加载完容易得到白卡片
+      imageUrl: CONFIG.FALLBACK_SHARE_IMAGE,
     };
   },
 });

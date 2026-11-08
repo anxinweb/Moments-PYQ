@@ -23,7 +23,8 @@ const CONFIG = {
   // 朋友圈没有标签体系，隐藏正文里的 #标签
   HIDE_TAGS: true,
 
-  // 正文折叠行数
+  // 正文折叠行数（首页 WXML 会把它注入 -webkit-line-clamp；
+  // index.wxss 里保留 6 作为兜底，改这里即可同步生效）
   FOLD_LINES: 6,
 
   // 封面随包内置，不依赖额外域名；替换此图即可换封面
@@ -45,6 +46,9 @@ const CONFIG = {
   VERSION: '1.0.2',
 
   REQUEST_TIMEOUT: 12000,
+  // 弱网兜底：与网页版一致，网络错误 / 5xx 自动重试 1 次；4xx 不重试
+  REQUEST_RETRY: 1,
+  RETRY_DELAY: 400,
 };
 
 module.exports = { CONFIG };

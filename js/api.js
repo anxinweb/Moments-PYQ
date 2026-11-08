@@ -28,6 +28,8 @@ async function getJSON(path, opts = {}) {
       return res.json();
     } catch (err) {
       lastErr = err;
+      // 4xx 是「确实没有/参数错」，重试也没用，直接抛；只对超时/网络/5xx 重试
+      if (/^HTTP 4/.test(err.message || '')) break;
       if (i < retries) await new Promise((r) => setTimeout(r, RETRY_DELAY * (i + 1)));
     }
   }

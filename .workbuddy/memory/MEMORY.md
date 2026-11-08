@@ -14,6 +14,7 @@
 - 仓库 anxinweb/Moments-PYQ：GitHub MCP unauthorized，用本地 git push；远端 main 分支 2026-11-08 重建过
 - **弱网兜底**（v20261109f）：所有 GET 走 api.js `getJSON`（统一 10s 超时 + 自动重试 1 次），新增请求别绕过它；首屏 6s 无数据弹 .feed-note「网络有点慢」+ 重载，失败显示失败态而非空白；封面 setCover 需 complete 兜底（iOS 缓存命中可能不触发 load）
 - **视频动态**（v20261109h，用户拍板）：**不做封面**，直接嵌 `<video controls preload="metadata">`（黑块可接受）；20261109g 的静态封面帧方案已整套撤掉（config VIDEO_POSTERS / assets/video-poster-* / .video-* 样式 / 播放委托），别再自作主张加回来。若将来要自动封面：memos 文件服务有 CORS 且支持 Range，跨域 canvas 抽帧可行，首帧约 1MB/视频
+- **视频防下载**（v20261109i）：视频一律无文件名链接（videoHtml 里不放 <a>），controlslist=nodownload、禁画中画/投屏、CSS 禁长按菜单、全局 contextmenu 拦 video 右键；fileHtml 普通附件的下载链接保留；更强防护（Referer 防盗链）需改 Memos 端 openresty，会连累小程序，未做
 
 ## 当前方案（用户拍板）
 - 评论存 Memos（令牌在 Vercel MEMOS_TOKEN，**待用户换成主号令牌**），可见性=审核开关（PRIVATE=待审，PUBLIC=过审）
@@ -60,3 +61,9 @@
 - `format.js` 新增 `clockText / shareTitle / fontScale`；`config.js` 新增 `VERSION / FALLBACK_SHARE_IMAGE`
 - **修复短文本无法长按复制**：`buildMoment` 曾给所有动态写 `folded: true`，短文本 `needFold=false` 既无「全文」按钮又拿不到 `user-select` → 永久不可复制。已改 `folded: needFold`，WXML 分支收紧为 `needFold && folded` 双重判断；可复制 text 加 `.text-selectable{display:block}` 扩大长按热区（真实数据首屏 20 条中 14 条受影响）
 - 注意：`user-select` 的系统选词菜单在**开发者工具模拟器里常不弹出**，验收长按复制必须点「预览」用真机；若真机仍无效，备选是改 `bindlongpress` 直接复制整段正文 + toast（更接近微信朋友圈，但会与 user-select 选词冲突，不能同时用）
+- **全量审计修复（14:40）**：`loadFirst` 刷新失败会卡骨架屏、`loadMore` 与刷新竞态（旧回调覆盖新 token）、旧音频实例回调污染状态 —— 三者均已用故障注入复现后修复；引入 `pageGeneration` 代次 + 分页路径增量 setData + 音频 `alive()` 校验 + 三页 `_unloaded`
+- **公共 `format.js#buildMoment(memo, opts)`** 是首页/详情页唯一的数据装配入口（首页 `foldable:true`，详情 `false`）；改展示逻辑只改这一处。折叠判定用 `estimateLines(text, charsPerLine)` 按显示宽度估算，别再用「字符数>150」硬阈值（150 西文只有 5 行会被误折叠且无法复制）
+- `getJSON` 有弱网重试 1 次（4xx 不重试）；`data.memos` 非数组判失败（否则会误显示空态）；`/api/feed` 是上游原样转发，作者/可见性/归档过滤都在小程序端做
+- **分享卡片 `imageUrl` 一律用缩略图**（原图实测 1.7MB，缩略图 37KB）；首页/资料页也有兜底封面；`FALLBACK_SHARE_IMAGE` 是站长头像，实测 `image/jpeg` 27KB，等于 `absolute(profile.avatarUrl)`
+- README 已整篇重写为当前状态（旧版前半还写着「无详情页/无分享/appid 仍为 touristappid」，会误导改错 AppID）；`packOptions.ignore` 已排除 .git / 私有配置 / README / .gitignore
+- 真实数据：首屏 20 条 = 14 短文本 + 3 长文本 + 3 无正文；`nextPageToken` 形如 `CBQQFA==`（含 `=`，必须 encodeURIComponent）

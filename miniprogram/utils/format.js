@@ -67,6 +67,21 @@ function clockText(sec) {
   return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
 }
 
+/** 估算正文渲染行数（以「每行可容纳的中文字数」为单位）：
+ *  CJK / 全角 / emoji 约占 1 个字宽，西文与数字约占 0.5 个。
+ *  用来决定是否显示「全文」，避免一串长 URL / 英文被误判成长文本而折叠。 */
+function estimateLines(text, charsPerLine) {
+  const per = Math.max(8, Number(charsPerLine) || 18);
+  return String(text || '').split('\n').reduce(function (sum, line) {
+    let width = 0;
+    for (const ch of line) {
+      const code = ch.codePointAt(0);
+      width += code > 0x2e80 || (code >= 0xff00 && code <= 0xffef) ? 1 : 0.5;
+    }
+    return sum + Math.max(1, Math.ceil(width / per));
+  }, 0);
+}
+
 /** 转发卡片标题：跳过空行、分割线、纯符号行，取第一条有效正文 */
 function shareTitle(content, fallback) {
   const lines = String(content || '').split('\n');
@@ -210,13 +225,58 @@ function mediaOf(memo) {
   return { images: images, extras: extras };
 }
 
+/** 首页与详情页共用的「原始 memo → 页面可绑定对象」，避免两处逻辑分歧。
+ *  opts: { hideTags, foldable, foldLines, charsPerLine,
+ *          layout: { cell3Px, cell2Px, grid2WidthPx, singleWidthPx } } */
+function buildMoment(memo, opts) {
+  const o = opts || {};
+  const layout = o.layout || {};
+  const src = memo || {};
+  const content = renderContent(src.content, { hideTags: o.hideTags !== false });
+  const media = mediaOf(src);
+  const total = media.images.length;
+  const images = media.images.slice(0, 9).map(function (img, i) {
+    return {
+      thumb: img.thumb,
+      origin: img.url,
+      more: i === 8 && total > 9,
+      moreCount: total > 9 ? total - 9 : 0,
+    };
+  });
+  const gridType = total === 1 ? 1 : (total === 2 || total === 4) ? 2 : 3;
+  const lines = estimateLines(content, o.charsPerLine || 18);
+  const needFold = !!o.foldable && lines > (o.foldLines || 6);
+  const name = String(src.name || '');
+
+  return {
+    uid: name.split('/')[1] || name,
+    content: content,
+    needFold: needFold,
+    // 只有真会被截断的长文本才默认折叠；短文本直接展开并可长按复制
+    folded: needFold,
+    timeText: timeText(src.createTime),
+    images: images,
+    allOrigins: media.images.map(function (img) { return img.url; }),
+    gridType: gridType,
+    gridStyle: gridType === 2 ? 'width:' + (layout.grid2WidthPx || '280px') : '',
+    cellStyle:
+      gridType === 2
+        ? 'width:' + (layout.cell2Px || '140px') + ';height:' + (layout.cell2Px || '140px')
+        : 'width:' + (layout.cell3Px || '90px') + ';height:' + (layout.cell3Px || '90px'),
+    singleStyle: 'width:' + (layout.singleWidthPx || '200px'),
+    extras: media.extras,
+  };
+}
+
 module.exports = {
   parseTime: parseTime,
   timeText: timeText,
   clockText: clockText,
+  estimateLines: estimateLines,
   shareTitle: shareTitle,
   fontScale: fontScale,
   renderContent: renderContent,
   mediaOf: mediaOf,
+  buildMoment: buildMoment,
   bytesText: bytesText,
 };

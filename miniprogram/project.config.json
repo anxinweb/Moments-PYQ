@@ -5,6 +5,22 @@
       {
         "value": ".workbuddy",
         "type": "folder"
+      },
+      {
+        "value": ".git",
+        "type": "folder"
+      },
+      {
+        "value": "README.md",
+        "type": "file"
+      },
+      {
+        "value": "project.private.config.json",
+        "type": "file"
+      },
+      {
+        "value": ".gitignore",
+        "type": "file"
       }
     ],
     "include": []

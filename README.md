@@ -13,7 +13,11 @@
 - 九宫格：单图自然比例、2/4 图两列、3+ 图三列，超 9 张显示「+N」
 - 图片双层加载：列表用 Memos 原生缩略图（`?thumbnail=true`，约 60-100KB），
   点开灯箱才加载原图；支持左右滑、双击缩放拖动、键盘方向键、ESC
-- 分页加载：每页 20 条 + 「加载更多」，当前页写入地址栏（`?page=2`），刷新/分享可回退
+- 分页加载：每页 20 条，**滚到底自动加载下一页**（底部按钮保留作兜底），当前页写入地址栏（`?page=2`），刷新/分享可回退
+- 评论：昵称可点主页、两级回复、支持超链接、先审后发（审核中只有自己可见）、超过 5 条折叠成「查看全部 N 条评论」并显示最早的 5 条（同微信）
+- 点赞：Upstash 存储，点赞人昵称同样可点主页；点赞区域点击不会误触评论框
+- 视频：只给看不给下 —— 不出现文件名下载链接，播放器隐藏下载按钮，禁右键另存、长按菜单、画中画与投屏
+- 弱网兜底：接口 10s 超时 + 自动重试一次；首屏 6s 没数据会提示「网络有点慢」并可重载，失败显示重试而不是白屏
 - 微信式相对时间（刚刚 / n分钟前 / n小时前 / 昨天 / M月D日 / YYYY年M月D日）
 - 骨架屏、失败重试、回到顶部
 - 深色 / 浅色主题，跟随系统可手动切换
@@ -33,6 +37,29 @@ api/profile.js      Edge 函数：转发用户资料
 assets/cover.jpg    封面图（直接替换此文件即可换封面）
 dev-server.mjs      本地预览服务器（仅开发用，不部署）
 ```
+
+## 自动化测试
+
+测试脚本在 `.preview/`（不随站点部署，已在 `.gitignore` 里）。首次使用：
+
+```bash
+cd .preview && npm i puppeteer-core   # 用一个已装好的浏览器驱动，无需下载 Chromium
+```
+
+跑法（`BASE` 不填默认打线上，填本地地址就测本地）：
+
+```bash
+node .preview/e2e-ui.mjs                       # 功能主流程 32 项
+node .preview/e2e-extra.mjs                    # 边界/接口 16 项（OG、PWA、无效链接、缓存头…）
+BASE=http://127.0.0.1:5173/ node .preview/e2e-ui.mjs
+node .preview/test-pager.mjs                   # 滚底自动翻页
+node .preview/test-sweep.mjs                   # 全站巡检 24 项
+node .preview/test-weaknet.mjs                 # 弱网：超时/失败/提示
+node .preview/test-video-nodl.mjs              # 视频无下载入口
+```
+
+脚本用的是系统已安装的 Edge（`C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`），
+换机器改脚本顶部 `EDGE` 路径即可。
 
 ## 本地预览
 
@@ -101,3 +128,5 @@ fetch(U.replace(/\/$/,"")+"/pipeline",{method:"POST",headers:{authorization:"Bea
 - [x] P2 评论（两级回复/超链接/审核流）+ 真实点赞
 - [x] P3 上线（Vercel + EdgeOne CDN）
 - [x] P4 首屏快照秒开、OG 分享卡片、评论邮件通知、点赞每日备份、表情面板、深色打磨
+- [x] P5 评论折叠（微信式最早 5 条）、资料页自定义链接、弱网超时兜底、视频防下载、滚底自动翻页
+- [x] 交付验收：e2e 48 项（功能 32 + 边界 16）+ 全站巡检 24 项，本地与线上双跑通过

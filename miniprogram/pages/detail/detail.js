@@ -34,7 +34,9 @@ Page({
   },
 
   onLoad: function (options) {
-    const uid = (options && options.uid) || '';
+    // 分享卡片的 query 由微信解码后传入，按 Memos uid 字符集清洗，
+    // 避免被篡改的参数污染复制链接与详情接口
+    const uid = String((options && options.uid) || '').replace(/[^a-zA-Z0-9_-]/g, '');
     const sys = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
     const bar = sys.statusBarHeight || 20;
     const width = sys.windowWidth || 375;
@@ -50,6 +52,8 @@ Page({
     this.setData({
       uid: uid,
       shareUrl: CONFIG.SHARE_BASE + uid,
+      // 数据还没回来时（用户立刻点「…」转发）也有一张可用封面
+      shareImage: CONFIG.FALLBACK_SHARE_IMAGE,
       statusBarHeight: bar,
       contentTop: bar + 44 + 12,
       fontPx: (16 * fmt.fontScale()).toFixed(1) + 'px',
@@ -67,6 +71,7 @@ Page({
   },
 
   onUnload: function () {
+    this._unloaded = true;
     this.destroyAudio();
   },
 
@@ -82,47 +87,36 @@ Page({
       getMemo(uid),
     ])
       .then(function (results) {
+        if (this._unloaded) return;
         const patch = { viewState: 'ready' };
         if (results[0]) patch.profile = results[0];
-        const m = this.buildMoment(results[1]);
+        const m = fmt.buildMoment(results[1], this.momentOptions());
         patch.moment = m;
-        // 纯文字动态也有卡片封面：回退到已在白名单内的站长头像
-        patch.shareImage = m.allOrigins.length ? m.allOrigins[0] : CONFIG.FALLBACK_SHARE_IMAGE;
+        // 转发卡片封面用缩略图（原图实测约 1.7MB，缩略图约 37KB）；
+        // 纯文字动态优先用接口返回的真实头像，接口失败再用内置兜底
+        const avatar = results[0] && results[0].avatar;
+        patch.shareImage = m.images.length
+          ? m.images[0].thumb
+          : (avatar || CONFIG.FALLBACK_SHARE_IMAGE);
         this.setData(patch);
       }.bind(this))
       .catch(function () {
+        if (this._unloaded) return;
         this.setData({ viewState: 'error' });
       }.bind(this));
   },
 
-  /** 与首页同一套展示逻辑，但详情页正文不折叠 */
-  buildMoment: function (memo) {
-    const content = fmt.renderContent(memo.content, { hideTags: CONFIG.HIDE_TAGS });
-    const media = fmt.mediaOf(memo);
-    const total = media.images.length;
-    const images = media.images.slice(0, 9).map(function (img, i) {
-      return {
-        thumb: img.thumb,
-        origin: img.url,
-        more: i === 8 && total > 9,
-        moreCount: total - 9,
-      };
-    });
-    const gridType = total === 1 ? 1 : (total === 2 || total === 4) ? 2 : 3;
+  /** 与首页共用 utils/format.js#buildMoment；差异只是详情页正文不折叠 */
+  momentOptions: function () {
     return {
-      uid: String(memo.name || '').split('/')[1] || String(memo.name || ''),
-      content: content,
-      timeText: fmt.timeText(memo.createTime),
-      images: images,
-      allOrigins: media.images.map(function (img) { return img.url; }),
-      gridType: gridType,
-      gridStyle: gridType === 2 ? 'width:' + this.data.grid2WidthPx : '',
-      cellStyle:
-        gridType === 2
-          ? 'width:' + this.data.cell2Px + ';height:' + this.data.cell2Px
-          : 'width:' + this.data.cell3Px + ';height:' + this.data.cell3Px,
-      singleStyle: 'width:' + this.data.singleWidthPx,
-      extras: media.extras,
+      hideTags: CONFIG.HIDE_TAGS,
+      foldable: false,
+      layout: {
+        cell3Px: this.data.cell3Px,
+        cell2Px: this.data.cell2Px,
+        grid2WidthPx: this.data.grid2WidthPx,
+        singleWidthPx: this.data.singleWidthPx,
+      },
     };
   },
 
@@ -166,11 +160,15 @@ Page({
     ctx.src = url;
     this.lastAudioSec = -1;
     this.audioDurationSec = 0;
+    // 与首页一致：旧实例销毁后到达的回调一律忽略
+    const alive = function () { return this.audioCtx === ctx; }.bind(this);
     ctx.onCanplay(function () {
+      if (!alive()) return;
       this.audioDurationSec = Number(ctx.duration) || 0;
       this.setData({ audioTimeText: '0:00 / ' + fmt.clockText(this.audioDurationSec) });
     }.bind(this));
     ctx.onTimeUpdate(function () {
+      if (!alive()) return;
       const cur = Number(ctx.currentTime) || 0;
       const sec = Math.floor(cur);
       if (sec === this.lastAudioSec) return;
@@ -181,11 +179,11 @@ Page({
         audioProgress: dur ? Math.min(100, Math.round((cur / dur) * 100)) : 0,
       });
     }.bind(this));
-    ctx.onEnded(function () { this.resetAudioState(); }.bind(this));
-    ctx.onError(function () { this.resetAudioState(); }.bind(this));
-    ctx.play();
+    ctx.onEnded(function () { if (alive()) this.resetAudioState(); }.bind(this));
+    ctx.onError(function () { if (alive()) this.resetAudioState(); }.bind(this));
     this.audioCtx = ctx;
     this.setData({ playingKey: url, audioProgress: 0, audioTimeText: '0:00 / --:--' });
+    ctx.play();
   },
 
   resetAudioState: function () {
@@ -194,14 +192,15 @@ Page({
   },
 
   destroyAudio: function () {
-    if (!this.audioCtx) return;
+    const ctx = this.audioCtx;
+    if (!ctx) return;
+    this.audioCtx = null; // 先置空，避免 stop/destroy 派发的回调重入
     try {
-      this.audioCtx.stop();
-      this.audioCtx.destroy();
+      ctx.stop();
+      ctx.destroy();
     } catch (err) {
       /* ignore */
     }
-    this.audioCtx = null;
   },
 
   goBack: function () {

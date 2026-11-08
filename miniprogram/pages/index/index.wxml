@@ -58,7 +58,8 @@
 
           <!-- 只有「需要折叠且当前仍折叠」的长文本才用普通 text 保证 line-clamp 生效；
                短文本、以及点开全文后的长文本都可选中复制 -->
-          <view wx:if="{{item.content}}" class="moment-text {{item.needFold && item.folded ? 'is-folded' : ''}}">
+          <view wx:if="{{item.content}}" class="moment-text {{item.needFold && item.folded ? 'is-folded' : ''}}"
+                style="{{item.needFold && item.folded ? '-webkit-line-clamp:' + foldLines : ''}}">
             <text wx:if="{{item.needFold && item.folded}}">{{item.content}}</text>
             <text wx:else class="text-selectable" user-select="{{true}}">{{item.content}}</text>
           </view>
@@ -72,7 +73,7 @@
                   data-mid="{{mIndex}}" data-index="{{imgIndex}}" bindtap="onPreviewImage">
               <image class="cell-img" src="{{img.thumb}}"
                      mode="{{item.gridType === 1 ? 'widthFix' : 'aspectFill'}}"
-                     lazy-load="true"
+                     lazy-load="{{true}}"
                      data-mid="{{mIndex}}" data-index="{{imgIndex}}" binderror="onImageError"></image>
               <view wx:if="{{img.more}}" class="cell-more"><text>+{{img.moreCount}}</text></view>
             </view>

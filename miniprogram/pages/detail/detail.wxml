@@ -43,6 +43,7 @@
                   data-index="{{imgIndex}}" bindtap="onPreviewImage">
               <image class="cell-img" src="{{img.thumb}}"
                      mode="{{moment.gridType === 1 ? 'widthFix' : 'aspectFill'}}"
+                     lazy-load="{{true}}"
                      data-index="{{imgIndex}}" binderror="onImageError"></image>
               <view wx:if="{{img.more}}" class="cell-more"><text>+{{img.moreCount}}</text></view>
             </view>

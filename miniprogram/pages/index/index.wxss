@@ -356,27 +356,8 @@
     to { transform: rotate(360deg); }
 }
 
-/* ---------------------------------------------------------------- 三态与骨架屏 */
-.state {
-    padding: 70px 20px;
-    text-align: center;
-}
-
-.state-text {
-    font-size: 14px;
-    color: #7f7f7f;
-}
-
-.retry {
-    display: inline-block;
-    margin-top: 16px;
-    padding: 8px 18px;
-    border: 0.5px solid #e6e6e6;
-    border-radius: 6px;
-    font-size: 14px;
-    color: #576b95;
-}
-
+/* ---------------------------------------------------------------- 骨架屏
+   .state / .state-text / .retry 已在 app.wxss 全局定义，这里不再重复 */
 .skeleton {
     display: flex;
     padding: 0 16px 18px;
